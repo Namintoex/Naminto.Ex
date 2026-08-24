@@ -37,7 +37,43 @@ Format ADR (Architecture Decision Record) léger. Chaque décision liste son con
 - **Date** : 2026-08-25
 - **Contexte** : le Prompt 02 doit construire un Design System centralisé piloté par tokens (couleurs, typographie, spacing…). Figer un framework CSS dès le Prompt 01 risquerait de contraindre ce choix.
 - **Décision** : scaffold Next.js créé sans Tailwind ; le choix de l'implémentation (Tailwind piloté par tokens, CSS Modules + tokens, ou autre) est différé au Prompt 02.
-- **Statut** : Ouvert — à trancher au Prompt 02.
+- **Statut** : Tranché à l'ADR-006 (Prompt 02).
+
+## ADR-006 — Tailwind CSS v4 piloté par tokens CSS + class-variance-authority
+
+- **Date** : 2026-08-25
+- **Contexte** : le Design System (Prompt 02) doit exposer des tokens centralisés (couleurs, typographie, spacing, radius, shadows) réutilisables par tous les composants, avec support natif clair/sombre.
+- **Décision** : Tailwind CSS v4 (config CSS-first via `@theme`), avec les tokens sémantiques définis comme variables CSS dans `globals.css` (`:root` / `.dark`) puis exposés à Tailwind. Les variantes de composants (Button, Badge, Alert…) utilisent `class-variance-authority` + `clsx`/`tailwind-merge` (helper `cn`).
+- **Statut** : Adopté.
+- **Conséquence** : toute évolution de la charte graphique se fait uniquement dans `src/app/globals.css` — aucune couleur ne doit être codée en dur dans les composants.
+
+## ADR-007 — next-themes pour la gestion clair/sombre
+
+- **Date** : 2026-08-25
+- **Contexte** : besoin d'un thème clair/sombre persistant, sans flash de contenu non stylé (FOUC) au chargement.
+- **Décision** : `next-themes` (stratégie `class` sur `<html>`), encapsulé dans `src/design-system/theme/theme-provider.tsx`.
+- **Statut** : Adopté.
+
+## ADR-008 — Radix UI comme primitives accessibles (Modal, Dropdown, Tabs)
+
+- **Date** : 2026-08-25
+- **Contexte** : la section 67 de l'architecture générale exige l'accessibilité (navigation clavier, lecteurs d'écran). Recoder à la main la gestion du focus, des portails et du clavier pour une modale/menu/onglets est risqué pour une application financière.
+- **Décision** : `@radix-ui/react-dialog`, `@radix-ui/react-dropdown-menu`, `@radix-ui/react-tabs`, `@radix-ui/react-label`, `@radix-ui/react-slot` comme primitives headless, stylées avec les tokens du Design System.
+- **Statut** : Adopté.
+
+## ADR-009 — lucide-react comme bibliothèque d'icônes
+
+- **Date** : 2026-08-25
+- **Contexte** : aucune charte d'icônes propriétaire n'existe. Construire un set d'icônes custom sans direction artistique serait prématuré.
+- **Décision** : `lucide-react` (icônes SVG, tree-shakeable, cohérentes avec un style « trait fin » adapté à un produit fintech premium).
+- **Statut** : Adopté — remplaçable sans impact structurel si une charte d'icônes officielle est fournie plus tard.
+
+## ADR-010 — i18n FR/EN : dictionnaire léger au Prompt 02, routing différé au Prompt 03
+
+- **Date** : 2026-08-25
+- **Contexte** : le Prompt 02 exige que le Design System « supporte FR/EN ». Une solution de routing i18n complète (ex. `next-intl` avec segments de locale) est une décision structurante qui recoupe le routing de l'Application Shell (Prompt 03, séparation USER APP / BACK OFFICE).
+- **Décision** : pour le Prompt 02, un `LocaleProvider` léger (contexte React + dictionnaires `fr`/`en` dans `src/design-system/i18n/`) suffit à démontrer et tester chaque composant dans les deux langues. Le choix définitif de la solution de routing i18n pour l'ensemble de l'application est différé au Prompt 03.
+- **Statut** : Adopté pour le Design System — **TODO_DECISION** pour l'i18n au niveau applicatif (voir tableau ci-dessous).
 
 ## TODO_DECISION en attente (issues des spécifications de domaine)
 
@@ -50,6 +86,6 @@ Ces points sont explicitement non définis dans les documents source. Ils ne doi
 | Payments | Barème complet des frais au-delà de 3,5 %/1000 FCFA ; durée d'expiration des demandes d'argent/QR ; politique de reversal auto vs manuel ; pays/devises additionnels |
 | Audit | Durée de rétention des journaux par juridiction ; liste des actions à double validation ; plateforme de stockage |
 | Observability | Plateforme d'observabilité retenue ; seuils d'alerte ; objectifs RTO/RPO |
-| Technique (ce dépôt) | Framework de tests (Vitest/Jest) ; implémentation CSS du Design System (ADR-005) |
+| Technique (ce dépôt) | Framework de tests (Vitest/Jest) ; solution de routing i18n applicative (voir ADR-010) — à trancher au Prompt 03 |
 
 Chaque nouveau `TODO_DECISION` rencontré pendant l'implémentation doit être ajouté à ce tableau plutôt que deviné.

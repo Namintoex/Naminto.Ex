@@ -13,8 +13,10 @@ Le dépôt était vierge de code au moment de l'audit : uniquement des documents
 | Frontend | Next.js 16 (App Router) + TypeScript | Décidé (utilisateur, 2026-08-25) |
 | Gestionnaire de paquets | npm | Décidé |
 | Backend / données | Supabase (Postgres, Auth, Storage) | Décidé — projet déjà créé par l'utilisateur, identifiants à fournir avant le Prompt 04 (Identity) |
-| Style / Design System | À déterminer au Prompt 02 (tokens centralisés — implémentation CSS non figée) | TODO_DECISION |
-| Tests | À déterminer au Prompt 01/02 (Vitest ou Jest + Testing Library pressenti pour Next.js/TS) | TODO_DECISION |
+| Style / Design System | Tailwind CSS v4 (tokens CSS `@theme`) + class-variance-authority + Radix UI (primitives accessibles) + lucide-react (icônes) | Décidé (Prompt 02) |
+| Thème clair/sombre | next-themes | Décidé (Prompt 02) |
+| i18n (Design System) | Dictionnaire léger FR/EN (contexte React) — routing i18n applicatif différé au Prompt 03 | Décidé pour le Design System, TODO_DECISION pour l'app |
+| Tests | À déterminer (Vitest ou Jest + Testing Library pressenti pour Next.js/TS) | TODO_DECISION |
 
 Voir `/docs/DECISIONS.md` pour le détail et la justification de chaque décision.
 
@@ -123,10 +125,19 @@ Source comptable de vérité, en écriture seule (append-only). Aucune écriture
 
 Logs, Metrics, Traces — voir `OBSERVABILITY — Spécification Markdown.docx` pour le détail des métriques minimales, de l'Availability Engine et du cycle de gestion des incidents.
 
-## 13. Prochaines étapes
+## 13. Design System (Prompt 02)
+
+Fondation UI centralisée dans `src/design-system/`, consommée via l'alias `@/design-system` :
+
+- **Tokens** : `src/app/globals.css` — palette de marque (placeholder, voir `docs/DECISIONS.md` ADR-006), neutres, statuts (success/warning/danger/info), radius, ombres, tokens sémantiques clair/sombre exposés à Tailwind via `@theme inline`.
+- **Composants** (`src/design-system/components/`) : Button, Input/Textarea/Select (`form-field.tsx`), Card, Badge, Alert, Modal (Radix Dialog), Table, DropdownMenu (Radix), Tabs (Radix), Spinner, Skeleton, EmptyState, ErrorState, ThemeToggle, LocaleToggle.
+- **Thème** : `src/design-system/theme/theme-provider.tsx` (next-themes, stratégie `class`).
+- **i18n (Design System uniquement)** : `src/design-system/i18n/` (LocaleProvider + dictionnaires FR/EN) — ne préjuge pas de la solution i18n applicative complète (routing), différée au Prompt 03.
+- **Démonstration** : page `/design-system` (`src/app/design-system/page.tsx`) — rend tous les composants dans les deux thèmes et les deux langues. Aucun composant financier spécifique n'y figure, conformément au Prompt 02.
+
+## 14. Prochaines étapes
 
 Conformément au protocole, les prompts sont exécutés un par un avec validation entre chaque étape :
 
-- **Prompt 02** — Foundation + Design System (tokens, composants réutilisables, FR/EN, clair/sombre).
-- **Prompt 03** — Application Shell (navigation, USER APP / BACK OFFICE séparés structurellement).
+- **Prompt 03** — Application Shell (navigation, USER APP / BACK OFFICE séparés structurellement, décision de routing i18n).
 - **Prompt 04** — Identity (nécessite les identifiants Supabase).
