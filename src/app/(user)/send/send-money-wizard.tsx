@@ -110,16 +110,36 @@ function SummaryRow({ label, value, strong }: { label: string; value: string; st
   );
 }
 
-export function SendMoneyWizard({ linkedAccounts }: { linkedAccounts: LinkedAccountOption[] }) {
+export interface InitialRecipient {
+  userId: string;
+  namintoId: string;
+  legalName: string;
+}
+
+export function SendMoneyWizard({
+  linkedAccounts,
+  initialRecipient,
+}: {
+  linkedAccounts: LinkedAccountOption[];
+  initialRecipient?: InitialRecipient | null;
+}) {
   const { t, locale } = useLocale();
 
-  const [step, setStep] = useState<Step>("recipientType");
-  const [mode, setMode] = useState<RecipientMode | null>(null);
+  // Bénéficiaire prérempli (QR Engine, Prompt 15) : saute directement à
+  // l'étape Montant, déjà vérifié côté serveur avant le rendu de cette
+  // page — jamais un scan qui exécute quoi que ce soit, seulement un
+  // pré-remplissage, la confirmation explicite reste entière plus loin.
+  const [step, setStep] = useState<Step>(initialRecipient ? "amount" : "recipientType");
+  const [mode, setMode] = useState<RecipientMode | null>(initialRecipient ? "internal" : null);
   const [linkedAccountId, setLinkedAccountId] = useState<string | null>(null);
 
-  const [namintoId, setNamintoId] = useState("");
+  const [namintoId, setNamintoId] = useState(initialRecipient?.namintoId ?? "");
   const [lookupPending, startLookup] = useTransition();
-  const [lookupResult, setLookupResult] = useState<RecipientLookupResult | null>(null);
+  const [lookupResult, setLookupResult] = useState<RecipientLookupResult | null>(
+    initialRecipient
+      ? { found: true, recipientUserId: initialRecipient.userId, namintoId: initialRecipient.namintoId, legalName: initialRecipient.legalName }
+      : null
+  );
   const [externalReference, setExternalReference] = useState("");
 
   const [amountInput, setAmountInput] = useState("");

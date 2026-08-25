@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { Check, Copy, QrCode as QrCodeIcon } from "lucide-react";
-import { Button, Card, CardContent, CardHeader, CardTitle, QrCode } from "@/design-system";
+import { Alert, Button, Card, CardContent, CardHeader, CardTitle, Input, QrCode } from "@/design-system";
 import { useLocale } from "@/design-system/i18n/locale-provider";
+import { generatePrefilledQrAction } from "@/domains/qr-engine/actions";
 
 export function ReceiveView({
   namintoId,
@@ -17,10 +18,30 @@ export function ReceiveView({
   const { t } = useLocale();
   const [copied, setCopied] = useState(false);
 
+  const [amount, setAmount] = useState("");
+  const [note, setNote] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [generated, setGenerated] = useState<{ shareLink: string; qrSvg: string } | null>(null);
+  const [pending, startTransition] = useTransition();
+
   async function copy() {
     await navigator.clipboard.writeText(namintoId);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  function generate() {
+    setError(null);
+    setGenerated(null);
+    const parsedAmount = Number(amount.replace(",", "."));
+    startTransition(async () => {
+      const result = await generatePrefilledQrAction({ amount: parsedAmount, note });
+      if (!result.ok) {
+        setError(result.errorKey);
+        return;
+      }
+      setGenerated({ shareLink: result.shareLink, qrSvg: result.qrSvg });
+    });
   }
 
   return (
@@ -50,8 +71,44 @@ export function ReceiveView({
 
           <p className="flex items-center gap-1.5 text-xs text-text-secondary">
             <QrCodeIcon className="size-3.5" aria-hidden />
-            {t("receive.qr.comingSoon")}
+            {t("receive.qr.scanHint")}
           </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("receive.prefilled.section")}</CardTitle>
+          <p className="text-sm text-text-secondary">{t("receive.prefilled.body")}</p>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          {error && <Alert variant="danger">{t(error)}</Alert>}
+          <Input
+            label={t("request.amount.label")}
+            inputMode="decimal"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+          />
+          <Input
+            label={t("request.note.label")}
+            placeholder={t("request.note.placeholder")}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            maxLength={140}
+          />
+          <Button loading={pending} onClick={generate}>
+            {t("receive.prefilled.generate")}
+          </Button>
+
+          {generated && (
+            <div className="flex flex-col items-center gap-3 border-t border-border-default pt-4">
+              <QrCode svg={generated.qrSvg} />
+              <code className="w-full truncate rounded-md bg-surface-sunken px-3 py-2 text-xs text-text-primary">
+                {generated.shareLink}
+              </code>
+              <p className="text-xs text-text-secondary">{t("receive.prefilled.expiry")}</p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
