@@ -7,13 +7,13 @@ import { authenticateRequest } from "./orchestrator-steps/authenticate";
 import { checkRisk } from "./orchestrator-steps/risk";
 import { checkCompliance } from "./orchestrator-steps/compliance";
 import { checkLimits } from "./orchestrator-steps/limits";
-import { calculateFee } from "./orchestrator-steps/fee";
+import { calculateFee as calculateFeeStep } from "./orchestrator-steps/fee";
 import { routeRequest } from "./orchestrator-steps/routing";
 import { executeProviderTransfer } from "./orchestrator-steps/execute-provider";
 import { writeLedgerEntries } from "./orchestrator-steps/ledger";
 import { notifyTransactionSettled } from "./orchestrator-steps/notification";
 import { scheduleReconciliation } from "./orchestrator-steps/reconciliation";
-import type { PaymentRequest } from "./orchestrator-steps/types";
+import type { PaymentRequest, ResolvedRoute } from "./orchestrator-steps/types";
 import type { Database } from "@/lib/supabase/database.types";
 
 export type { PaymentRequest } from "./orchestrator-steps/types";
@@ -60,12 +60,14 @@ async function safeTransition(
 }
 
 /**
- * Payment Orchestrator (Prompt 09). Flux : Request → Validation →
- * Authentication → Risk → Compliance → Limits → Fee → Routing →
- * Provider Gateway → Transaction → Ledger → Notification →
- * Reconciliation. Chaque étape est un module indépendant
- * (orchestrator-steps/*), remplaçable individuellement sans toucher ce
- * fichier.
+ * Payment Orchestrator (Prompt 09/10). Flux : Request → Validation →
+ * Routing → Fee → Transaction (créée) → Authentication → Risk →
+ * Compliance → Limits → Provider Gateway → Ledger → Notification →
+ * Reconciliation. Routing et Fee sont résolus avant la création de la
+ * transaction (Fee Engine, Prompt 10, a besoin de `provider` comme
+ * dimension de correspondance — voir docs/DECISIONS.md ADR-029/033).
+ * Chaque étape est un module indépendant (orchestrator-steps/*),
+ * remplaçable individuellement sans toucher ce fichier.
  *
  * Retries sûrs : idempotencyKey identique ⇒ createTransaction renvoie la
  * transaction existante ; si elle est déjà dans un état terminal, aucune
@@ -80,14 +82,22 @@ export async function runPaymentOrchestrator(request: PaymentRequest): Promise<O
     throw new OrchestratorError("SYSTEM_ERROR", `Validation: ${(err as Error).message}`);
   }
 
-  // Le diagramme du Prompt 09 place "Fee" avant "Transaction" dans le
-  // flux logique : le montant total débité doit être connu dès la
-  // création de l'enregistrement (utile pour l'idempotence et
-  // l'affichage), même si le Fee Engine réel (Prompt 10) n'est pas
-  // encore branché. Le calcul est pur et ne dépend d'aucune étape
-  // ultérieure (Risk/Compliance/Limits), donc l'avancer ici ne change
-  // aucun résultat.
-  const { fee } = await calculateFee(request);
+  // Routing est résolu avant la création de la transaction : le Fee
+  // Engine (Prompt 10) a besoin de `provider` comme dimension de
+  // correspondance, et le diagramme du Prompt 09 place de toute façon
+  // "Transaction" après "Provider Gateway" — seule la création de
+  // l'enregistrement (nécessaire dès maintenant pour l'idempotence et le
+  // suivi d'état, Prompt 08) est avancée. Routing est pur en lecture,
+  // sans effet de bord, donc l'avancer ne change aucun résultat.
+  let route: ResolvedRoute;
+  try {
+    route = await routeRequest(request);
+  } catch (err) {
+    if (err instanceof OrchestratorError) throw err;
+    throw new OrchestratorError("SYSTEM_ERROR", `Routing: ${(err as Error).message}`);
+  }
+
+  const { fee } = await calculateFeeStep(request, route);
 
   // 2. Création idempotente de la transaction.
   let transaction: Transaction;
@@ -99,7 +109,7 @@ export async function runPaymentOrchestrator(request: PaymentRequest): Promise<O
       sourceReference: request.sourceLinkedAccountId,
       destinationType: request.destinationType,
       destinationReference: request.destinationLinkedAccountId,
-      provider: null,
+      provider: route.provider,
       amount: request.amount,
       currency: request.currency,
       fee,
@@ -123,11 +133,10 @@ export async function runPaymentOrchestrator(request: PaymentRequest): Promise<O
     transaction = (await transitionTransaction(transaction.id, "authenticated")) as Transaction;
     transaction = (await transitionTransaction(transaction.id, "processing")) as Transaction;
 
-    // → Risk → Compliance → Limits → Routing (Fee déjà calculé ci-dessus)
+    // → Risk → Compliance → Limits (Fee et Routing déjà résolus ci-dessus)
     await checkRisk(request);
     await checkCompliance(request);
     await checkLimits(request);
-    const route = await routeRequest(request);
 
     // → Provider Gateway (ignoré si virement portefeuille à portefeuille pur)
     let providerTransactionId: string | null = null;

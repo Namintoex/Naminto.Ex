@@ -33,7 +33,10 @@ export async function routeRequest(request: PaymentRequest): Promise<ResolvedRou
     throw new OrchestratorError("VALIDATION_ERROR", "Compte lié introuvable ou non autorisé");
   }
   if (account.status !== "active") {
-    throw new OrchestratorError("PROVIDER_ERROR", `Compte lié non actif (statut: ${account.status})`, {
+    // Résolu avant toute authentification/appel fournisseur (voir
+    // orchestrator.ts) : un compte lié non actif est une invalidité de
+    // la requête elle-même, pas un échec de communication fournisseur.
+    throw new OrchestratorError("VALIDATION_ERROR", `Compte lié non actif (statut: ${account.status})`, {
       status: account.status,
     });
   }

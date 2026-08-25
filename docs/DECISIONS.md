@@ -267,6 +267,23 @@ Format ADR (Architecture Decision Record) léger. Chaque décision liste son con
 - **Statut** : Corrigé.
 - **Trouvé et corrigé pendant la vérification** : un test relisant `provider_transaction_id` **depuis la base** (pas seulement la valeur renvoyée en mémoire par l'orchestrateur) aurait échoué sans ce correctif — ajouté spécifiquement après avoir remarqué que rien n'appelait jamais d'`update` avec ce champ.
 
+## ADR-033 — Fee Engine : Routing avancé avant la création de la transaction
+
+- **Date** : 2026-08-25
+- **Contexte** : le Prompt 10 exige explicitement que `provider` soit une dimension sur laquelle une règle de frais peut se spécialiser. Or `provider` n'était connu qu'après Routing, que le Prompt 09 plaçait après le calcul du frais dans son implémentation initiale.
+- **Décision** : `routeRequest` est désormais résolu avant `calculateFee` et avant `createTransaction` (voir `orchestrator.ts`). Routing reste une lecture pure sans effet de bord — l'avancer ne change aucun résultat, et permet au Fee Engine de recevoir `provider` dès le premier calcul. Une erreur de routing (compte lié introuvable, non actif) est donc maintenant classifiée `VALIDATION_ERROR` et survient avant toute création de transaction, plutôt que `PROVIDER_ERROR` en cours de traitement.
+- **Statut** : Adopté. Complète l'ADR-029 (Prompt 09) sur le calcul anticipé du frais.
+
+## ADR-034 — Fee Engine entièrement piloté par la configuration (`fee_rules`)
+
+- **Date** : 2026-08-25
+- **Contexte** : Prompt 10 — « Ne code aucune règle tarifaire dans les composants UI » et « Toutes les règles doivent être configurables ».
+- **Décision** : `fee_rules` (`supabase/migrations/0006_fee_rules.sql`) porte toutes les règles ; chaque colonne optionnelle (`country`, `currency`, `min_amount`/`max_amount`, `source_type`, `destination_type`, `provider`, `transaction_type`, `user_tier`) vaut NULL comme joker. La règle active la plus spécifique (le plus de dimensions contraintes) qui correspond à la requête est retenue (`src/domains/payments/fee-engine/match-rule.ts`, pur et testé unitairement). Une seule règle est semée à ce stade — le taux 3,5 % XOF déjà documenté (ADR précédent) — devenue une donnée configurable au lieu d'une constante TypeScript.
+- **`feePayer`** : la règle porte un `fee_payer` par défaut, mais l'appelant peut le surcharger explicitement (`feePayerOverride`) — reflète le choix utilisateur documenté (architecture générale, section 28 : « Qui paie les frais ? »), pas encore exposé dans une UI (Send Money, Prompt 13).
+- **Statut** : Adopté.
+- **Accès** : aucune policy RLS cliente sur `fee_rules` — lecture/écriture réservées au `service_role`, faute d'UI Back Office de tarification (Prompt 22).
+- **Vérifié empiriquement** (tests d'intégration) : le taux de repli à plusieurs montants (1000/5000/10000/250000 FCFA), `feePayerOverride`, une règle fournisseur plus spécifique l'emportant sur le taux générique, le respect d'une plage de montant, et l'absence de règle correspondante (devise inconnue) levant `NoMatchingFeeRuleError`.
+
 ## TODO_DECISION en attente (issues des spécifications de domaine)
 
 Ces points sont explicitement non définis dans les documents source. Ils ne doivent pas être devinés ; ils doivent être tranchés par l'utilisateur au moment où le prompt correspondant les rend bloquants.
@@ -276,7 +293,7 @@ Ces points sont explicitement non définis dans les documents source. Ils ne doi
 | Identity | Fournisseur SMS pour activer le flux téléphone + OTP (ADR-014) ; biométrie/WebAuthn (non implémentée) ; authentification supplémentaire (step-up) explicite sur nouvel appareil — actuellement seulement journalisée (`new_device_login`), pas bloquante ; politique de complexité mot de passe (au-delà du minimum 8 caractères) ; durée de vie des sessions Supabase (config par défaut non modifiée) ; rate limiting applicatif additionnel au-delà de celui de Supabase Auth |
 | Sécurité (Back Office) | RBAC sur `/admin` — voir ADR-016, **bloquant avant toute mise en production** |
 | User | Processus de changement de numéro de téléphone ; politique de changement du nom légal post-KYC (les deux restent en lecture seule dans `/settings` pour l'instant) ; intégration d'un fournisseur KYC externe (statut actuellement toujours `unverified`, jamais mis à jour automatiquement) |
-| Payments | Barème complet des frais au-delà de 3,5 %/1000 FCFA ; durée d'expiration des demandes d'argent/QR ; politique de reversal auto vs manuel ; pays/devises additionnels ; workflow de résolution d'un statut `disputed` (ADR-027) |
+| Payments | Barème dégressif réel au-delà du taux de repli 3,5 %/1000 FCFA (la table `fee_rules` le permet, mais aucune règle par palier n'est encore saisie) ; notion de `user_tier` (colonne prête, aucun palier utilisateur n'existe encore côté User) ; durée d'expiration des demandes d'argent/QR ; politique de reversal auto vs manuel ; pays/devises additionnels ; workflow de résolution d'un statut `disputed` (ADR-027) |
 | Audit | Durée de rétention des journaux par juridiction ; liste des actions à double validation ; plateforme de stockage |
 | Observability | Plateforme d'observabilité retenue ; seuils d'alerte ; objectifs RTO/RPO |
 | Accounts / Providers | Adapters REAL pour Orange/MTN/Moov/Wave/cartes — identifiants API, contrats, endpoints à obtenir auprès de chaque fournisseur (bloquant pour toute mise en production) ; vérification de signature webhook réelle et persistance (Prompt 25) ; détection automatique `connection_expired`/`provider_unavailable` (Availability Engine, Prompt 47) |

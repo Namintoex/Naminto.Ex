@@ -20,6 +20,8 @@ export type LinkedAccountStatus =
 export type ConsentStatus = "granted" | "revoked" | "pending";
 export type SourceType = "naminto_wallet" | "linked_account";
 export type DestinationType = "naminto_wallet" | "linked_account" | "external";
+export type FeePayer = "sender" | "recipient";
+export type FeeTransactionType = "send" | "request";
 
 export interface Database {
   public: {
@@ -241,6 +243,58 @@ export interface Database {
           reason?: string | null;
         };
         Update: never;
+        Relationships: [];
+      };
+      fee_rules: {
+        Row: {
+          id: string;
+          country: string | null;
+          currency: string | null;
+          min_amount: number | null;
+          max_amount: number | null;
+          source_type: SourceType | null;
+          destination_type: DestinationType | null;
+          provider: Provider | null;
+          transaction_type: FeeTransactionType | null;
+          user_tier: string | null;
+          rate_percent: number;
+          flat_fee: number;
+          fee_payer: FeePayer;
+          active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          country?: string | null;
+          currency?: string | null;
+          min_amount?: number | null;
+          max_amount?: number | null;
+          source_type?: SourceType | null;
+          destination_type?: DestinationType | null;
+          provider?: Provider | null;
+          transaction_type?: FeeTransactionType | null;
+          user_tier?: string | null;
+          rate_percent: number;
+          flat_fee?: number;
+          fee_payer?: FeePayer;
+          active?: boolean;
+        };
+        Update: Partial<{
+          country: string | null;
+          currency: string | null;
+          min_amount: number | null;
+          max_amount: number | null;
+          source_type: SourceType | null;
+          destination_type: DestinationType | null;
+          provider: Provider | null;
+          transaction_type: FeeTransactionType | null;
+          user_tier: string | null;
+          rate_percent: number;
+          flat_fee: number;
+          fee_payer: FeePayer;
+          active: boolean;
+        }>;
         Relationships: [];
       };
     };
