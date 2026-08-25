@@ -317,8 +317,21 @@ Domaine implémenté dans `src/domains/accounts/`, page `/accounts` (`src/app/(u
 - **Vérifié manuellement contre le vrai projet Supabase** : liste affichant les transactions réelles des Prompts 13-15 avec la bonne contrepartie ; recherche partielle insensible à la casse (`fdfa071a` → `NEX-FDFA071A`) ; détail avec débit/crédit corrects (750 + 26,25 = 776,25 XOF pour `fee_payer = sender`) et timeline complète (7 transitions) ; reçu avec confirmation Ledger visible ; page « Transaction introuvable » pour une référence inexistante ou non autorisée.
 - **Non couvert à ce stade** : export du reçu en PDF (impression navigateur uniquement) ; recherche plein texte sur le motif/la note ; filtres combinés sauvegardés.
 
-## 28. Prochaines étapes
+## 28. Risk Engine (Prompt 17)
+
+`src/domains/payments/risk-engine/` — remplace le STUB `checkRisk` posé au Prompt 09 (ADR-028), qui renvoyait toujours `LOW` sans jamais analyser quoi que ce soit. Lecture seule stricte : **le Risk Engine n'écrit jamais dans le Ledger**, ni nulle part ailleurs — il fournit une décision au Payment Orchestrator, qui seul agit dessus.
+
+- **Sept signaux indépendants** (`assess-risk.ts`, chacun pur et testé isolément) couvrant exactement les dimensions exigées : `amount` (paliers XOF), `frequency` (réutilise `getFrequencyUsage` du Limit Engine, Prompt 11 — jamais dupliqué), `history` (nombre de transactions déjà réglées à vie, proxy de maturité du compte), `device` (statut réel de l'appareil, Identity/Prompt 04 — voir ci-dessous), `beneficiary` (nouveau bénéficiaire pour un montant significatif), `behavior` (montant très supérieur à la moyenne habituelle de l'utilisateur), `context` (sortie vers un bénéficiaire externe pour un montant élevé).
+- **Décision structurée** : chaque signal porte un `code`, un `level` (`LOW`/`MEDIUM`/`HIGH`) et un `reason` textuel + `details` — jamais une raison opaque. La décision globale (`aggregateRiskDecision`) retient le signal le plus sévère, **sans règle de composition** (plusieurs signaux MEDIUM simultanés ne deviennent jamais HIGH à eux seuls) — voir ADR-045 pour la justification (ce rôle revient au Fraud Engine, Prompt 18).
+- **Seuils en constantes de code, pas configurables en base** — à la différence du Fee Engine (Prompt 10) et du Limit Engine (Prompt 11), dont l'énoncé exige explicitement des règles configurables : le Prompt 17 ne le demande pas. Voir ADR-045.
+- **Branché sur l'orchestrateur** : `orchestrator.ts` bloque désormais réellement (`RISK_REJECTION`) quand la décision est `HIGH`, avant même Compliance ou Limits (ordre déjà fixé au Prompt 09) — jusqu'ici ce code d'erreur n'était jamais atteignable en pratique.
+- **`deviceFingerprint` enfin threadé jusqu'à l'orchestrateur** : `PaymentRequest` n'avait jamais ce champ ; Send Money (Prompt 13), le règlement d'une demande (Prompt 14) et le paiement d'un QR `PREFILLED_PAYMENT` (Prompt 15) le renseignent désormais via `getOrCreateDeviceCookie()` (Identity, Prompt 04) — même cookie httpOnly déjà utilisé à la connexion, aucun nouveau mécanisme de suivi. Absent, il ne pénalise jamais le signal `device` (`LOW`, jamais `MEDIUM` par défaut).
+- **Erreurs `RISK_REJECTION`/`LIMIT_ERROR`/etc. enfin classifiées côté Server Actions** : `payMoneyRequestAction` et `payPrefilledQrAction` ne renvoyaient qu'un message générique pour tout code autre que `AUTH_ERROR` — corrigé en réutilisant la même table de correspondance que Send Money (`send.error.*`), trouvé en vérifiant que le blocage s'affichait correctement pour ces deux parcours, pas seulement Send Money.
+- **Vérifié manuellement contre le vrai projet Supabase** : envoi de 600 000 XOF réellement bloqué (« Cette opération a été bloquée pour des raisons de sécurité »), transaction persistée en statut `failed` — avant même que Compliance (seuil KYC 200 000 XOF) n'ait eu l'occasion de rejeter pour une autre raison, confirmant l'ordre du pipeline.
+- **Non couvert à ce stade** : escalade multi-signaux (Fraud Engine, Prompt 18) ; seuils configurables en base ; action corrective sur `MEDIUM` autre que le renvoyer tel quel (aucune revue manuelle, aucun step-up — Prompt 18/19).
+
+## 29. Prochaines étapes
 
 Conformément au protocole, les prompts sont exécutés un par un avec validation entre chaque étape :
 
-- **Prompt 17** — à confirmer avec l'utilisateur avant de commencer.
+- **Prompt 18** — à confirmer avec l'utilisateur avant de commencer.

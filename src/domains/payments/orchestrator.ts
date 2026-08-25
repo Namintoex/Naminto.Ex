@@ -138,7 +138,14 @@ export async function runPaymentOrchestrator(request: PaymentRequest): Promise<O
     transaction = (await transitionTransaction(transaction.id, "processing")) as Transaction;
 
     // → Risk → Compliance → Limits (Fee et Routing déjà résolus ci-dessus)
-    await checkRisk(request);
+    const riskDecision = await checkRisk(request);
+    if (riskDecision.level === "HIGH") {
+      throw new OrchestratorError(
+        "RISK_REJECTION",
+        `Risque élevé : ${riskDecision.reasons.map((r) => r.reason).join("; ")}`,
+        { reasons: riskDecision.reasons }
+      );
+    }
     await checkCompliance(request);
     await checkLimits(request, route);
 

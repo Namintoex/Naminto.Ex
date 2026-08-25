@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { findRecipientByNamintoId } from "@/domains/identity/queries";
+import { getOrCreateDeviceCookie } from "@/domains/identity/devices";
 import { calculateFee } from "@/domains/payments/fee-engine";
 import { runPaymentOrchestrator, OrchestratorError } from "@/domains/payments/orchestrator";
 import type { PaymentRequest } from "@/domains/payments/orchestrator-steps/types";
@@ -151,6 +152,7 @@ export async function sendMoneyAction(input: SendMoneyInput): Promise<SendMoneyR
     pin: input.pin,
     feePayerOverride: input.feePayer,
     idempotencyKey: input.idempotencyKey,
+    deviceFingerprint: await getOrCreateDeviceCookie(),
   };
 
   const request: PaymentRequest =

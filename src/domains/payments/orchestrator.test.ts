@@ -245,6 +245,28 @@ describe("Payment Orchestrator (intégration)", () => {
     expect(tx?.status).toBe("cancelled");
   });
 
+  it("RISK_REJECTION : montant au-delà du seuil HIGH du Risk Engine, la transaction se termine en failed", async () => {
+    const request = baseRequest({ amount: 500_001 });
+
+    let caught: unknown;
+    try {
+      await runPaymentOrchestrator(request);
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(OrchestratorError);
+    expect((caught as OrchestratorError).code).toBe("RISK_REJECTION");
+    expect((caught as OrchestratorError).details?.reasons).toBeDefined();
+
+    const { data: tx } = await admin
+      .from("transactions")
+      .select("id, status")
+      .eq("idempotency_key", request.idempotencyKey)
+      .single();
+    if (tx) createdTransactionIds.push(tx.id);
+    expect(tx?.status).toBe("failed");
+  });
+
   it("COMPLIANCE_REJECTION : montant au-delà du seuil KYC sans compte vérifié", async () => {
     const request = baseRequest({ amount: 250_000 });
 

@@ -27,6 +27,10 @@ export interface PaymentRequest {
   pin: string;
   /** Empêche toute double exécution en cas de rejeu (Master Prompt, section 6). */
   idempotencyKey: string;
+  /** Empreinte d'appareil (cookie `nx_device_id`) — signal du Risk Engine
+   *  (Prompt 17). `null`/absent si l'appelant ne l'a pas transmise :
+   *  jamais traité comme un signal négatif en soi (voir risk-engine). */
+  deviceFingerprint?: string | null;
 }
 
 export interface ResolvedRoute {

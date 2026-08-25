@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { logSecurityEvent } from "@/domains/identity/security-events";
+import { getOrCreateDeviceCookie } from "@/domains/identity/devices";
 import { OrchestratorError } from "@/domains/payments/orchestrator";
 import { cancelMoneyRequest } from "./cancel";
 import { createMoneyRequest } from "./create";
@@ -83,6 +84,16 @@ const AUTH_ERROR_REASON_KEYS: Record<string, string> = {
   invalid: "pin.error.invalid",
 };
 
+const ORCHESTRATOR_ERROR_KEYS: Record<string, string> = {
+  VALIDATION_ERROR: "send.error.validation",
+  RISK_REJECTION: "send.error.risk",
+  COMPLIANCE_REJECTION: "send.error.compliance",
+  LIMIT_ERROR: "send.error.limit",
+  PROVIDER_ERROR: "send.error.provider",
+  TIMEOUT: "send.error.timeout",
+  SYSTEM_ERROR: "send.error.system",
+};
+
 /**
  * Étape « Exécution » du règlement d'une demande — délègue entièrement à
  * `fulfillMoneyRequest`, elle-même entièrement déléguée au Payment
@@ -97,7 +108,12 @@ export async function payMoneyRequestAction(input: PayMoneyRequestInput): Promis
   if (!user) return { ok: false, errorKey: "session.error.expired" };
 
   try {
-    const result = await fulfillMoneyRequest({ token: input.token, payerUserId: user.id, pin: input.pin });
+    const result = await fulfillMoneyRequest({
+      token: input.token,
+      payerUserId: user.id,
+      pin: input.pin,
+      deviceFingerprint: await getOrCreateDeviceCookie(),
+    });
     return { ok: true, transactionId: result.transactionId, reference: result.reference };
   } catch (err) {
     if (err instanceof MoneyRequestNotFoundError) return { ok: false, errorKey: "pay.error.notFound" };
@@ -108,7 +124,7 @@ export async function payMoneyRequestAction(input: PayMoneyRequestInput): Promis
       if (err.code === "AUTH_ERROR" && typeof reason === "string" && AUTH_ERROR_REASON_KEYS[reason]) {
         return { ok: false, errorKey: AUTH_ERROR_REASON_KEYS[reason] };
       }
-      return { ok: false, errorKey: "send.error.system" };
+      return { ok: false, errorKey: ORCHESTRATOR_ERROR_KEYS[err.code] ?? "send.error.system" };
     }
     return { ok: false, errorKey: "send.error.system" };
   }

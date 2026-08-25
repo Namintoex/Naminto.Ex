@@ -13,6 +13,7 @@ export interface FulfillMoneyRequestParams {
   token: string;
   payerUserId: string;
   pin: string;
+  deviceFingerprint?: string | null;
 }
 
 export interface FulfillMoneyRequestResult {
@@ -69,6 +70,7 @@ export async function fulfillMoneyRequest(params: FulfillMoneyRequestParams): Pr
     currency: request.currency,
     pin: params.pin,
     idempotencyKey: `money-request-${request.token}`,
+    deviceFingerprint: params.deviceFingerprint ?? null,
   });
 
   // Conditionnel sur status = 'pending' : si une tentative concurrente a

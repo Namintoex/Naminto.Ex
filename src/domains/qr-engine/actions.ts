@@ -3,6 +3,7 @@
 import { createHash } from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import { getIdentityProfile } from "@/domains/identity/queries";
+import { getOrCreateDeviceCookie } from "@/domains/identity/devices";
 import { generateQrSvg } from "@/lib/qr";
 import { getRequestOrigin } from "@/lib/request-origin";
 import { runPaymentOrchestrator, OrchestratorError } from "@/domains/payments/orchestrator";
@@ -73,6 +74,16 @@ const AUTH_ERROR_REASON_KEYS: Record<string, string> = {
   invalid: "pin.error.invalid",
 };
 
+const ORCHESTRATOR_ERROR_KEYS: Record<string, string> = {
+  VALIDATION_ERROR: "send.error.validation",
+  RISK_REJECTION: "send.error.risk",
+  COMPLIANCE_REJECTION: "send.error.compliance",
+  LIMIT_ERROR: "send.error.limit",
+  PROVIDER_ERROR: "send.error.provider",
+  TIMEOUT: "send.error.timeout",
+  SYSTEM_ERROR: "send.error.system",
+};
+
 /**
  * Étape « authenticate → execute » pour PREFILLED_PAYMENT — revérifie
  * la signature côté serveur (ne fait jamais confiance à un payload
@@ -120,6 +131,7 @@ export async function payPrefilledQrAction(input: PayPrefilledQrInput): Promise<
       currency: payload.currency,
       pin: input.pin,
       idempotencyKey,
+      deviceFingerprint: await getOrCreateDeviceCookie(),
     });
     return { ok: true, transactionId: transaction.id, reference: transaction.reference };
   } catch (err) {
@@ -128,7 +140,7 @@ export async function payPrefilledQrAction(input: PayPrefilledQrInput): Promise<
       if (err.code === "AUTH_ERROR" && typeof reason === "string" && AUTH_ERROR_REASON_KEYS[reason]) {
         return { ok: false, errorKey: AUTH_ERROR_REASON_KEYS[reason] };
       }
-      return { ok: false, errorKey: "send.error.system" };
+      return { ok: false, errorKey: ORCHESTRATOR_ERROR_KEYS[err.code] ?? "send.error.system" };
     }
     return { ok: false, errorKey: "send.error.system" };
   }
