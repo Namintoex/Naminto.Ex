@@ -45,6 +45,7 @@ export function createSandboxAdapter(config: SandboxProviderConfig): ProviderAda
     return balances.get(externalReference)!;
   }
 
+  /** Débite le compte lié — argent qui en sort vers Naminto.Ex/ailleurs. */
   async function executeTransfer(params: ProviderTransferParams): Promise<ProviderTransferResult> {
     const existing = seenIdempotencyKeys.get(params.idempotencyKey);
     if (existing) {
@@ -66,6 +67,23 @@ export function createSandboxAdapter(config: SandboxProviderConfig): ProviderAda
     }
 
     balances.set(params.externalReference, balance - params.amount);
+    transactions.set(providerTransactionId, { status: "confirmed" });
+    const result: ProviderTransferResult = { providerTransactionId, status: "confirmed" };
+    seenIdempotencyKeys.set(params.idempotencyKey, result);
+    return result;
+  }
+
+  /** Crédite le compte lié — argent qui y entre depuis Naminto.Ex. */
+  async function executeReceive(params: ProviderTransferParams): Promise<ProviderTransferResult> {
+    const existing = seenIdempotencyKeys.get(params.idempotencyKey);
+    if (existing) {
+      return existing;
+    }
+
+    const balance = getOrInitBalance(params.externalReference);
+    const providerTransactionId = `${config.provider}_${randomUUID()}`;
+
+    balances.set(params.externalReference, balance + params.amount);
     transactions.set(providerTransactionId, { status: "confirmed" });
     const result: ProviderTransferResult = { providerTransactionId, status: "confirmed" };
     seenIdempotencyKeys.set(params.idempotencyKey, result);
@@ -94,7 +112,7 @@ export function createSandboxAdapter(config: SandboxProviderConfig): ProviderAda
     },
 
     transfer: executeTransfer,
-    receive: executeTransfer,
+    receive: executeReceive,
 
     async getTransactionStatus(providerTransactionId: string): Promise<ProviderTransferResult> {
       const tx = transactions.get(providerTransactionId);

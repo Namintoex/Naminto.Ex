@@ -86,3 +86,24 @@ export function assertTransition(from: TransactionStatus, to: TransactionStatus)
 export function isTerminalStatus(status: TransactionStatus): boolean {
   return ALLOWED_TRANSITIONS[status].length === 0;
 }
+
+const IN_FLIGHT_STATUSES: TransactionStatus[] = [
+  "created",
+  "validating",
+  "authentication_required",
+  "authenticated",
+  "processing",
+  "provider_confirmed",
+];
+
+/**
+ * Distinct de `isTerminalStatus` : `settled` a des transitions sortantes
+ * (reversed/refunded/disputed, pour des actions post-règlement
+ * exceptionnelles) mais représente un paiement déjà abouti. Utilisé par
+ * le Payment Orchestrator (Prompt 09) pour décider si une requête rejouée
+ * (même idempotencyKey) doit réexécuter le pipeline ou renvoyer le
+ * résultat déjà obtenu tel quel.
+ */
+export function isInFlight(status: TransactionStatus): boolean {
+  return IN_FLIGHT_STATUSES.includes(status);
+}

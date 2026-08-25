@@ -106,7 +106,8 @@ export async function createTransaction(params: CreateTransactionParams) {
 export async function transitionTransaction(
   transactionId: string,
   to: TransactionStatus,
-  reason?: string
+  reason?: string,
+  extra?: { providerTransactionId?: string | null }
 ) {
   const admin = createAdminClient();
 
@@ -124,7 +125,12 @@ export async function transitionTransaction(
 
   const { data: updated, error: updateError } = await admin
     .from("transactions")
-    .update({ status: to })
+    .update({
+      status: to,
+      ...(extra?.providerTransactionId !== undefined
+        ? { provider_transaction_id: extra.providerTransactionId }
+        : {}),
+    })
     .eq("id", transactionId)
     .select("*")
     .single();

@@ -211,10 +211,22 @@ Domaine implémenté dans `src/domains/accounts/`, page `/accounts` (`src/app/(u
 - **Schéma** (`supabase/migrations/0005_transactions.sql`) : `transactions` (sender/recipient, source/destination, provider, amount/currency/fee/total, reference `NEX-XXXXXXXX`, idempotency_key, status) et `transaction_status_events` (historique append-only de chaque transition). **Aucune policy RLS d'écriture** sur les deux tables — lecture seule pour les participants, toute mutation passe par `transactions.ts` (`service_role`).
 - **Défense en profondeur** : un trigger Postgres (`check_transaction_status_transition`) revalide la même State Machine côté base, en miroir du TypeScript — voir `docs/DECISIONS.md` ADR-026.
 - **Service** (`transactions.ts`) : `createTransaction` (idempotente par clé), `transitionTransaction` (applique `assertTransition` avant toute écriture), `getTransactionById`. Aucune Server Action générique « changer le statut » n'est exposée à un formulaire — conforme à l'exigence explicite du Prompt 08.
-- **Non couvert à ce stade** : aucun flux utilisateur ne crée encore de transaction (attend le Payment Orchestrator, Prompt 09, et Send Money, Prompt 13) ; Fee Engine non branché (`fee` vaut 0 par défaut) ; résolution d'un statut `disputed` (ADR-027).
+- **Non couvert à ce stade** : résolution d'un statut `disputed` (ADR-027).
 
-## 20. Prochaines étapes
+## 20. Payment Orchestrator (Prompt 09)
+
+`src/domains/payments/orchestrator.ts` + `orchestrator-steps/` — assemble tous les domaines précédents (Identity, Transaction, Provider Gateway) en un pipeline unique. Premier flux utilisateur réel créant des transactions (aucun n'existait avant ce prompt).
+
+- **Flux** : Request → Validation → Authentication → Risk → Compliance → Limits → Fee → Routing → Provider Gateway → (Transaction créée en amont, voir ADR-029) → Ledger → Notification → Reconciliation. Chaque étape vit dans son propre module (`orchestrator-steps/{validate,authenticate,risk,compliance,limits,fee,routing,execute-provider,ledger,notification,reconciliation}.ts`) — indépendante et remplaçable sans toucher `orchestrator.ts`.
+- **Étapes réelles dès ce prompt** : Validation (structurelle), Authentication (réutilise `verifyPinForUser` du domaine Identity — extrait de `verifyPinAction` pour ne pas dupliquer la logique de verrouillage), Compliance (seuil KYC 200 000 FCFA, seule règle documentée), Fee (taux flat 3,5 %, seule règle documentée), Routing et Provider Gateway (réels, via le Provider Registry du Prompt 07).
+- **Étapes STUB** (voir `docs/DECISIONS.md` ADR-028) : Risk (Prompt 17), Limits (Prompt 11), Ledger (Prompt 12), Notification (Prompt 20), Reconciliation (Prompt 24) — présentes dans le pipeline avec leur signature finale, ne rejettent/ne persistent rien pour l'instant.
+- **Classification d'erreur** : `OrchestratorError` avec l'un des 8 codes exigés (`VALIDATION_ERROR`, `AUTH_ERROR`, `RISK_REJECTION`, `COMPLIANCE_REJECTION`, `LIMIT_ERROR`, `PROVIDER_ERROR`, `TIMEOUT`, `SYSTEM_ERROR`). Chaque erreur transitionne la transaction vers l'état d'échec approprié (`rejected`/`cancelled`/`failed`/`expired` selon la phase — voir `failureStatusFor` dans `orchestrator.ts`).
+- **Retries sûrs** : `idempotencyKey` identique ⇒ `createTransaction` renvoie la transaction déjà créée ; si elle a déjà quitté les statuts « en cours » (`isInFlight`, voir ADR-030 — distinct de `isTerminalStatus` du Prompt 08), aucune étape à effet de bord (PIN, appel fournisseur) n'est rejouée.
+- **Correction Provider Gateway associée** : `receive()` créditait par erreur comme `transfer()` (débit) dans les adapters SANDBOX — corrigé (ADR-031), avec une suite de tests dédiée qui n'existait pas au Prompt 07.
+- **Non couvert à ce stade** : aucune UI n'appelle encore l'orchestrateur (attend Send Money, Prompt 13) ; retry automatique interne sur `PROVIDER_ERROR`/`TIMEOUT` (seule la sécurité du rejeu externe est implémentée) ; virement Naminto.Ex → Naminto.Ex pur (portefeuille à portefeuille) route correctement sans fournisseur mais ne crédite encore aucun solde réel côté destinataire (attend le Ledger, Prompt 12).
+
+## 21. Prochaines étapes
 
 Conformément au protocole, les prompts sont exécutés un par un avec validation entre chaque étape :
 
-- **Prompt 09** — Payment Orchestrator (flux Request → Validation → Authentication → Risk → Compliance → Limits → Fee → Routing → Provider Gateway → Transaction → Ledger → Notification → Reconciliation).
+- **Prompt 10** — Fee Engine (règles configurables par pays/devise/montant/fournisseur, remplaçant le taux flat 3,5 % codé au Prompt 09).

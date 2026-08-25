@@ -6,7 +6,7 @@ import { createHash } from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getOrCreateDeviceCookie, registerDevice } from "./devices";
-import { hashPin, isValidPinFormat, verifyPinHash, PIN_MAX_ATTEMPTS, PIN_LOCKOUT_MINUTES } from "./pin";
+import { hashPin, isValidPinFormat, verifyPinForUser } from "./pin";
 import { logSecurityEvent } from "./security-events";
 
 export type ActionResult = { error: string } | { success: true };
@@ -258,53 +258,17 @@ export async function verifyPinAction(pin: string): Promise<ActionResult> {
     return { error: "session.error.expired" };
   }
 
-  const admin = createAdminClient();
-  const { data: credentials } = await admin
-    .from("pin_credentials")
-    .select("pin_hash, failed_attempts, locked_until")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (!credentials) {
-    return { error: "pin.error.notSet" };
+  const result = await verifyPinForUser(user.id, pin);
+  if (result.ok) {
+    return { success: true };
   }
 
-  if (credentials.locked_until && new Date(credentials.locked_until) > new Date()) {
-    return { error: "pin.error.locked" };
-  }
-
-  const valid = await verifyPinHash(pin, credentials.pin_hash);
-
-  if (!valid) {
-    const attempts = credentials.failed_attempts + 1;
-    const locked = attempts >= PIN_MAX_ATTEMPTS;
-    await admin
-      .from("pin_credentials")
-      .update({
-        failed_attempts: locked ? 0 : attempts,
-        locked_until: locked
-          ? new Date(Date.now() + PIN_LOCKOUT_MINUTES * 60_000).toISOString()
-          : null,
-      })
-      .eq("user_id", user.id);
-
-    await logSecurityEvent({
-      userId: user.id,
-      type: locked ? "pin_locked" : "pin_verification_failed",
-      metadata: { attempts },
-    });
-
-    return { error: locked ? "pin.error.locked" : "pin.error.invalid" };
-  }
-
-  if (credentials.failed_attempts > 0) {
-    await admin
-      .from("pin_credentials")
-      .update({ failed_attempts: 0, locked_until: null })
-      .eq("user_id", user.id);
-  }
-
-  return { success: true };
+  const errorKey = {
+    not_set: "pin.error.notSet",
+    locked: "pin.error.locked",
+    invalid: "pin.error.invalid",
+  } as const;
+  return { error: errorKey[result.reason] };
 }
 
 export async function revokeDeviceAction(deviceId: string): Promise<ActionResult> {

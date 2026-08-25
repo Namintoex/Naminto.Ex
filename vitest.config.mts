@@ -6,6 +6,10 @@ export default defineConfig({
     environment: "node",
     setupFiles: ["./vitest.setup.ts"],
     include: ["src/**/*.test.ts"],
+    // Les tests d'intégration enchaînent plusieurs allers-retours réseau
+    // vers le vrai projet Supabase (transitions de State Machine, appels
+    // du Provider Gateway) — le délai par défaut de 5s est trop court.
+    testTimeout: 30_000,
   },
   resolve: {
     alias: {

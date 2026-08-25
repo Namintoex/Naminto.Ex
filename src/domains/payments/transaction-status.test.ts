@@ -5,6 +5,7 @@ import {
   TRANSACTION_STATUSES,
   assertTransition,
   canTransition,
+  isInFlight,
   isTerminalStatus,
   type TransactionStatus,
 } from "./transaction-status";
@@ -93,6 +94,41 @@ describe("transaction state machine", () => {
       expect(err).toBeInstanceOf(InvalidTransactionTransitionError);
       expect((err as InvalidTransactionTransitionError).from).toBe("failed");
       expect((err as InvalidTransactionTransitionError).to).toBe("settled");
+    }
+  });
+
+  it("settled n'est pas terminal (transitions post-règlement possibles) mais n'est plus in-flight", () => {
+    // settled a des transitions sortantes (reversed/refunded/disputed) —
+    // isTerminalStatus renvoie donc false, volontairement distinct de
+    // isInFlight qui sert au court-circuit de rejeu de l'orchestrateur.
+    expect(isTerminalStatus("settled")).toBe(false);
+    expect(isInFlight("settled")).toBe(false);
+  });
+
+  it("isInFlight distingue les statuts en cours des statuts aboutis (succès ou échec)", () => {
+    const inFlight: TransactionStatus[] = [
+      "created",
+      "validating",
+      "authentication_required",
+      "authenticated",
+      "processing",
+      "provider_confirmed",
+    ];
+    const notInFlight: TransactionStatus[] = [
+      "settled",
+      "failed",
+      "rejected",
+      "expired",
+      "cancelled",
+      "reversed",
+      "refunded",
+      "disputed",
+    ];
+    for (const status of inFlight) {
+      expect(isInFlight(status)).toBe(true);
+    }
+    for (const status of notInFlight) {
+      expect(isInFlight(status)).toBe(false);
     }
   });
 

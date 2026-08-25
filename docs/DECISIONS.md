@@ -228,6 +228,45 @@ Format ADR (Architecture Decision Record) léger. Chaque décision liste son con
 - **Décision** : `disputed` n'a aucune transition sortante dans `ALLOWED_TRANSITIONS`, plutôt que d'inventer un chemin de résolution plausible.
 - **Statut** : Adopté — TODO_DECISION ci-dessous pour le workflow de résolution des litiges.
 
+## ADR-028 — Payment Orchestrator : étapes STUB indépendantes plutôt que reportées
+
+- **Date** : 2026-08-25
+- **Contexte** : le Prompt 09 précède les moteurs qu'il orchestre (Fee: Prompt 10, Limits: Prompt 11, Ledger: Prompt 12, Risk: Prompt 17, Fraud: Prompt 18, Compliance: Prompt 19, Notification: Prompt 20, Reconciliation: Prompt 24). Construire l'orchestrateur sans ces moteurs impose un choix : attendre qu'ils existent, ou les représenter par des étapes STUB déjà présentes dans le pipeline.
+- **Décision** : chaque étape vit dans son propre module (`src/domains/payments/orchestrator-steps/`), avec la signature qu'elle aura une fois réelle. Les étapes déjà couvertes par une règle **documentée** sont implémentées réellement dès maintenant (Compliance : seuil KYC 200 000 FCFA ; Fee : taux flat 3,5 %) ; celles qui n'ont aucune règle documentée restent des STUB qui ne rejettent jamais (Risk, Limits) ou ne persistent rien (Ledger, Notification, Reconciliation). Brancher le moteur réel d'une étape ne nécessite de modifier que son propre module, jamais `orchestrator.ts`.
+- **Statut** : Adopté.
+
+## ADR-029 — Fee calculé avant la création de la transaction (déviation mineure du diagramme)
+
+- **Date** : 2026-08-25
+- **Contexte** : le diagramme du Prompt 09 place « Fee » après Risk/Compliance/Limits et « Transaction » après Provider Gateway. Mais le domaine Transaction (Prompt 08) exige un enregistrement dès le début pour le suivi d'état et l'idempotence, et `total` (montant + frais) est une colonne `not null` dès la création.
+- **Décision** : le calcul du frais (pur, ne dépendant que de `amount`/`currency` — jamais du résultat de Risk/Compliance/Limits) est avancé avant `createTransaction`, pour que `fee`/`total` soient corrects dès la création plutôt que mis à jour a posteriori. Le reste de l'ordre (Risk → Compliance → Limits → Routing → Provider Gateway) suit exactement le diagramme.
+- **Statut** : Adopté.
+- **Trouvé et corrigé pendant la vérification** : la première version calculait le frais après la création de la transaction sans jamais le persister — `transaction.fee` valait 0 au lieu de 175 pour un envoi de 5 000 FCFA. Repéré par un test d'intégration réel, pas une relecture de code.
+
+## ADR-030 — `isInFlight` distinct de `isTerminalStatus` pour le court-circuit de rejeu
+
+- **Date** : 2026-08-25
+- **Contexte** : « retries sûrs » exige qu'un rejeu de la même idempotencyKey après un paiement déjà réglé ne réexécute aucune étape à effet de bord.
+- **Décision** : `isTerminalStatus` (Prompt 08, `ALLOWED_TRANSITIONS[status].length === 0`) renvoie **false** pour `settled`, puisque `settled` a des transitions sortantes exceptionnelles (`reversed`/`refunded`/`disputed`). Un nouveau helper `isInFlight` (`src/domains/payments/transaction-status.ts`) distingue les statuts « en cours » (`created` → `provider_confirmed`) des statuts « aboutis » (`settled` inclus, plus tous les échecs terminaux). Le Payment Orchestrator court-circuite dès que `!isInFlight(transaction.status)`.
+- **Statut** : Adopté.
+- **Trouvé et corrigé pendant la vérification** : la première version utilisait `isTerminalStatus`, qui ne court-circuitait jamais pour une transaction déjà réglée — le rejeu tentait de retransitionner `settled → validating` et échouait avec `InvalidTransactionTransitionError`. Repéré par le test d'intégration « retries sûrs », pas une relecture de code.
+
+## ADR-031 — Correction Provider Gateway : `receive` créditait par erreur comme `transfer`
+
+- **Date** : 2026-08-25
+- **Contexte** : la fabrique SANDBOX du Prompt 07 aliasait `receive` directement sur la même fonction que `transfer`, qui **débite** toujours le compte lié. Or `receive` doit représenter l'argent qui **entre** dans le compte lié depuis Naminto.Ex (ex. destination = compte lié), donc **créditer**. Cette confusion n'avait aucune conséquence visible avant le Prompt 09 : rien n'appelait encore `receive()`.
+- **Décision** : `create-sandbox-adapter.ts` a désormais deux fonctions distinctes — `executeTransfer` (débite) et `executeReceive` (crédite), chacune avec sa propre idempotence.
+- **Statut** : Corrigé.
+- **Trouvé pendant la vérification** : en écrivant le Payment Orchestrator (Prompt 09) et en réfléchissant à quelle méthode appeler selon que le compte lié est source ou destination — pas détecté au Prompt 07 faute d'appelant réel à l'époque. Une suite de tests Vitest dédiée (`create-sandbox-adapter.test.ts`, absente au Prompt 07) couvre maintenant explicitement les deux directions.
+
+## ADR-032 — `transitionTransaction` accepte des champs additionnels à persister
+
+- **Date** : 2026-08-25
+- **Contexte** : `provider_transaction_id` était bien renvoyé dans l'objet transaction retourné par l'orchestrateur, mais jamais réellement écrit en base — la fonction `transitionTransaction` (Prompt 08) ne touchait que la colonne `status`.
+- **Décision** : `transitionTransaction(id, to, reason?, extra?)` accepte un 4ᵉ paramètre optionnel (`{ providerTransactionId }` pour l'instant) fusionné dans la même requête `update`, pour que la transition de statut et l'enregistrement du résultat fournisseur restent atomiques.
+- **Statut** : Corrigé.
+- **Trouvé et corrigé pendant la vérification** : un test relisant `provider_transaction_id` **depuis la base** (pas seulement la valeur renvoyée en mémoire par l'orchestrateur) aurait échoué sans ce correctif — ajouté spécifiquement après avoir remarqué que rien n'appelait jamais d'`update` avec ce champ.
+
 ## TODO_DECISION en attente (issues des spécifications de domaine)
 
 Ces points sont explicitement non définis dans les documents source. Ils ne doivent pas être devinés ; ils doivent être tranchés par l'utilisateur au moment où le prompt correspondant les rend bloquants.
