@@ -67,6 +67,24 @@ export async function findRecipientByNamintoId(namintoId: string): Promise<Recip
 }
 
 /**
+ * Résout le nom affichable d'un utilisateur par son id — utilisé pour
+ * afficher « qui demande » sur la page publique d'un lien de paiement
+ * (Prompt 14, `/pay/[token]`), où le visiteur n'est jamais le titulaire
+ * du profil consulté. Même principe d'exposition minimale que
+ * `findRecipientByNamintoId`.
+ */
+export async function getPublicProfile(userId: string): Promise<RecipientLookup | null> {
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("identity_profiles")
+    .select("user_id, naminto_id, legal_name")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (!data) return null;
+  return { userId: data.user_id, namintoId: data.naminto_id, legalName: data.legal_name };
+}
+
+/**
  * La table pin_credentials n'a aucune policy SELECT (voir migration
  * 0001_identity.sql) — même le titulaire ne peut pas lire son propre hash.
  * Cette vérification d'existence passe donc par le client service_role.

@@ -274,8 +274,22 @@ Domaine implémenté dans `src/domains/accounts/`, page `/accounts` (`src/app/(u
 - **Vérifié manuellement contre le vrai projet Supabase** : envoi interne réglé de bout en bout (statut `settled`, écritures Ledger équilibrées vérifiées en base), aperçu de frais réactif au changement de payeur, état vide pour l'étape « compte lié » sans compte actif, échec PIN affichant le message spécifique (`pin.error.invalid`) plutôt qu'une erreur générique.
 - **Non couvert à ce stade** : envoi `naminto_wallet → external` ou `linked_account → naminto_wallet` (combinaisons non exercées par l'orchestrateur existant — TODO_DECISION, voir ADR-041) ; scan QR réel ; page `/history` (toujours « Bientôt disponible », Prompt à venir).
 
-## 25. Prochaines étapes
+## 25. Receive + Request Money (Prompt 14)
+
+`src/domains/payments/money-requests/` + `src/app/(user)/{receive,request,pay}/` — Receive Money (passif, identité déjà connue) et Request Money (actif, nouveau domaine `money_requests`).
+
+- **Receive Money** (`/receive`) : aucune nouvelle table — affiche `identity_profiles.naminto_id`/`legal_name` (Prompt 04) et un QR non signé encodant l'identifiant, pour alimenter la recherche « Un utilisateur Naminto.Ex » déjà construite par Send Money (Prompt 13).
+- **Schéma** (`supabase/migrations/0010_money_requests.sql`) : `money_requests` (requester_user_id, `token` non devinable, amount/currency/note, status `pending|fulfilled|cancelled|expired`, `fulfilled_transaction_id`, `expires_at`). Seule policy RLS : lecture par le demandeur de ses propres lignes — aucune policy publique par jeton (voir ADR-042), aucune policy d'écriture cliente.
+- **Statut effectif calculé, jamais physiquement écrit** : `effectiveStatus()` (`money-requests/types.ts`, pur) traite une ligne `pending` dont `expires_at` est dépassé comme `expired` à la lecture — pas de job planifié pour réécrire les lignes expirées (hors périmètre de ce prompt).
+- **Cycle de vie** (`create.ts`, `cancel.ts`, `fulfill.ts`) : `createMoneyRequest` génère un jeton `crypto.randomUUID()` et une échéance de 7 jours (ADR-042, TODO_DECISION si une autre durée est requise) ; `cancelMoneyRequest` vérifie propriétaire + statut effectif `pending` ; `fulfillMoneyRequest` délègue entièrement au Payment Orchestrator (`naminto_wallet → naminto_wallet`, comme Send Money) avec un `idempotencyKey` déterministe (`money-request-${token}`) puis marque la demande `fulfilled` de façon conditionnelle (`.eq('status','pending')`, pour ne jamais écraser un règlement concurrent). Rejeu par le même payeur : idempotent, renvoie la transaction déjà créée sans rappeler l'orchestrateur.
+- **Pages** : `/request` (création + liste de ses propres demandes), `/request/[id]` (détail réservé au demandeur — vérification de propriété manuelle, `getMoneyRequestById` passe par service_role), `/pay/[token]` (lien de partage public — protégé par la session Naminto.Ex comme le reste de l'app, pas par une policy RLS ; résolution du jeton et du nom du demandeur via `service_role`, `getPublicProfile` n'exposant que naminto_id/nom légal).
+- **QR** (`src/lib/qr.ts`, `qrcode` npm) : généré côté serveur (jamais dans le bundle client), rendu par le composant Design System `QrCode`. Non signé — voir Prompt 15 (QR Engine) pour le format signé/typé (`BENEFICIARY`/`REQUEST`/`PAYMENT_REQUEST`/`PREFILLED_PAYMENT`). Aucune information secrète encodée (identifiant public ou lien de partage déjà partageable).
+- **Origine absolue fiable** (`src/lib/request-origin.ts`) : le lien de partage nécessitait l'origine de la requête ; `headers().get("origin")` (utilisé par erreur dans une première version, repéré en testant réellement le lien affiché) est vide sur une navigation GET classique — seul `Host`/`x-forwarded-host` est systématiquement présent.
+- **Vérifié manuellement contre le vrai projet Supabase** : création → détail → paiement par un second utilisateur réel (statut `fulfilled`, transaction `settled`, `fulfilled_transaction_id` correct) → réaffichage `Réglée` sans formulaire de paiement ; annulation ; auto-paiement bloqué (« C'est votre propre demande »).
+- **Non couvert à ce stade** : scan QR caméra (Prompt 15) ; job d'expiration physique (`expired` reste calculé) ; `naminto_wallet → external` / `linked_account → naminto_wallet` pour le règlement d'une demande (mêmes limites que Send Money, ADR-041).
+
+## 26. Prochaines étapes
 
 Conformément au protocole, les prompts sont exécutés un par un avec validation entre chaque étape :
 
-- **Prompt 14** — à confirmer avec l'utilisateur avant de commencer.
+- **Prompt 15** — à confirmer avec l'utilisateur avant de commencer.

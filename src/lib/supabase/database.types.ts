@@ -26,6 +26,7 @@ export type LimitType = "per_transaction_amount" | "daily_amount" | "monthly_amo
 export type LedgerAccountOwnerType = "user_wallet" | "provider_suspense" | "fee_revenue" | "external_suspense";
 export type LedgerEntryKind = "settlement" | "reversal" | "refund";
 export type LedgerEntryDirection = "debit" | "credit";
+export type MoneyRequestStatus = "pending" | "fulfilled" | "cancelled" | "expired";
 
 export interface Database {
   public: {
@@ -393,6 +394,38 @@ export interface Database {
           reference: string;
         };
         Update: never;
+        Relationships: [];
+      };
+      money_requests: {
+        Row: {
+          id: string;
+          requester_user_id: string;
+          token: string;
+          amount: number;
+          currency: string;
+          note: string | null;
+          status: MoneyRequestStatus;
+          fulfilled_transaction_id: string | null;
+          expires_at: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          requester_user_id: string;
+          token: string;
+          amount: number;
+          currency?: string;
+          note?: string | null;
+          status?: MoneyRequestStatus;
+          fulfilled_transaction_id?: string | null;
+          expires_at: string;
+        };
+        Update: Partial<{
+          status: MoneyRequestStatus;
+          fulfilled_transaction_id: string | null;
+          expires_at: string;
+        }>;
         Relationships: [];
       };
     };
