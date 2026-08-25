@@ -170,8 +170,19 @@ Domaine implémenté dans `src/domains/identity/` (Server Actions et requêtes) 
 - **Protections de sécurité** : verrouillage du PIN après 5 échecs, journal de sécurité (`security_events`) pour connexion réussie/échouée, nouvel appareil, changement de mot de passe/PIN, révocation d'appareil, déconnexion. Le rate limiting sur mot de passe s'appuie sur les protections natives de Supabase Auth (aucune couche applicative additionnelle).
 - **Non couvert à ce stade** (voir `docs/DECISIONS.md`, TODO_DECISION) : vérification téléphone/SMS, biométrie/WebAuthn, RBAC Back Office, step-up MFA explicite sur nouvel appareil (actuellement journalisé mais non bloquant).
 
-## 16. Prochaines étapes
+## 16. User Profile + KYC Foundation (Prompt 05)
+
+Domaine implémenté dans `src/domains/user/`, sur la même table `identity_profiles` que le domaine Identity (voir `docs/DECISIONS.md` ADR-017 pour la justification).
+
+- **Schéma** (`supabase/migrations/0002_user_profile.sql`) : ajout de `kyc_status` (`unverified | pending | verified | rejected | requires_action`), `preferred_currency`, `notifications_enabled`, `sound_enabled` à `identity_profiles`.
+- **Protection KYC** : trigger `protect_privileged_identity_columns` — `kyc_status`, `status` et `phone_verified` ne sont modifiables que par le client `service_role`, quelle que soit la policy RLS d'update. Vérifié empiriquement par un appel REST direct (voir ADR-018).
+- **Page `/settings`** (`src/app/(user)/settings/`) : section Profil (naminto_id, nom légal, e-mail, téléphone — lecture seule), section KYC (badge de statut + rappel du seuil de vérification renforcée à 200 000 FCFA, aucune action de vérification réelle), section Préférences (langue, devise, notifications, sons) via `updatePreferencesAction`.
+- **Audit** : les changements de préférences émettent un événement `preferences_updated` dans `security_events` (réutilise le mécanisme d'audit du domaine Identity plutôt que d'en créer un second).
+- **Nouveau composant Design System** : `Switch` (`@radix-ui/react-switch`), ajouté à `/design-system` et utilisé pour les préférences booléennes.
+- **Non couvert à ce stade** : intégration d'un fournisseur KYC réel (le statut reste `unverified` pour tous les comptes), changement de numéro de téléphone ou de nom légal (champs en lecture seule), gestion des bénéficiaires/contacts (non mentionnée explicitement dans le Prompt 05 officiel — reportée sans decision à prendre pour l'instant).
+
+## 17. Prochaines étapes
 
 Conformément au protocole, les prompts sont exécutés un par un avec validation entre chaque étape :
 
-- **Prompt 05** — User Profile + KYC Foundation.
+- **Prompt 06** — Linked Accounts (comptes liés : Orange, MTN, Moov, Wave, cartes prépayées).

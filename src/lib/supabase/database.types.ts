@@ -1,10 +1,12 @@
 /**
- * Types manuels reflétant supabase/migrations/0001_identity.sql.
- * À remplacer par `supabase gen types typescript` une fois le CLI Supabase
- * connecté au projet (voir docs/DECISIONS.md, TODO_DECISION).
+ * Types manuels reflétant supabase/migrations/0001_identity.sql et
+ * 0002_user_profile.sql. À remplacer par `supabase gen types typescript`
+ * une fois le CLI Supabase connecté au projet (voir docs/DECISIONS.md,
+ * TODO_DECISION).
  */
 export type IdentityStatus = "pending_verification" | "active" | "suspended" | "closed";
 export type DeviceStatus = "active" | "untrusted" | "revoked";
+export type KycStatus = "unverified" | "pending" | "verified" | "rejected" | "requires_action";
 export type Locale = "fr" | "en";
 
 export interface Database {
@@ -19,6 +21,10 @@ export interface Database {
           phone_verified: boolean;
           status: IdentityStatus;
           preferred_language: Locale;
+          kyc_status: KycStatus;
+          preferred_currency: string;
+          notifications_enabled: boolean;
+          sound_enabled: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -30,6 +36,10 @@ export interface Database {
           phone_verified?: boolean;
           status?: IdentityStatus;
           preferred_language?: Locale;
+          kyc_status?: KycStatus;
+          preferred_currency?: string;
+          notifications_enabled?: boolean;
+          sound_enabled?: boolean;
         };
         Update: Partial<{
           naminto_id: string;
@@ -38,6 +48,10 @@ export interface Database {
           phone_verified: boolean;
           status: IdentityStatus;
           preferred_language: Locale;
+          kyc_status: KycStatus;
+          preferred_currency: string;
+          notifications_enabled: boolean;
+          sound_enabled: boolean;
         }>;
         Relationships: [];
       };

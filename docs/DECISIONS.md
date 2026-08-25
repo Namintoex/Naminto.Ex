@@ -139,6 +139,28 @@ Format ADR (Architecture Decision Record) léger. Chaque décision liste son con
 - **Statut** : Adopté comme mesure temporaire — **TODO_DECISION bloquant avant mise en production** : RBAC (Prompt 23) doit restreindre `/admin` aux rôles Support/KYC/Compliance/Risk/Finance/Operations/Security/Legal/Super Admin.
 - **Conséquence** : `src/middleware.ts` renommé en `src/proxy.ts` (export `proxy` au lieu de `middleware`) — Next.js 16 a déprécié la convention `middleware`. Migration effectuée via lecture de `node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/proxy.md`.
 
+## ADR-017 — User étend identity_profiles plutôt qu'une table séparée
+
+- **Date** : 2026-08-25
+- **Contexte** : Prompt 05 (User Profile + KYC Foundation). La documentation d'architecture (section 68) présente Identity et User comme deux domaines distincts, et la spécification USER envisageait initialement une table `UserProfile` séparée.
+- **Décision** : `identity_profiles` (créée au Prompt 04) est étendue par `supabase/migrations/0002_user_profile.sql` (`kyc_status`, `preferred_currency`, `notifications_enabled`, `sound_enabled`) plutôt que de créer une seconde table faisant doublon. Identity et User restent deux bounded contexts au niveau du **code** (`src/domains/identity/` vs `src/domains/user/`, requêtes et Server Actions séparées), mais partagent la même table racine — conforme à la règle du Master Prompt « ne crée jamais un deuxième système qui fait la même chose » et à la phrase de l'architecture générale : « L'identité Naminto.Ex constitue la racine de toutes les fonctionnalités personnelles ».
+- **Statut** : Adopté.
+
+## ADR-018 — KYC : colonnes protégées par trigger, jamais auto-attribuables
+
+- **Date** : 2026-08-25
+- **Contexte** : le Prompt 05 exige de préparer le modèle KYC sans prétendre à une vérification réelle, et d'ajouter permissions/audit. La policy RLS `identity_profiles_update_own` (Prompt 04) autorise la mise à jour de toute la ligne par son titulaire — un risque si `kyc_status` restait dans son périmètre.
+- **Décision** : trigger `protect_privileged_identity_columns` (fonction `SECURITY INVOKER`, vérifie `auth.role()`) rejette toute tentative de modification de `kyc_status`, `status` ou `phone_verified` par un rôle autre que `service_role`, quelle que soit la policy RLS. Le badge KYC affiché dans `/settings` est donc purement informatif — aucune action de vérification n'existe encore côté produit (fournisseur externe à intégrer plus tard, hors périmètre de ce prompt).
+- **Statut** : Adopté.
+- **Vérifié empiriquement** : appel `PATCH` direct à l'API REST Supabase (`Authorization: Bearer <token utilisateur>`) tentant de passer `kyc_status` à `verified` → rejeté avec l'erreur du trigger (HTTP 400, `P0001`).
+
+## ADR-019 — Préférences de langue/devise stockées mais non branchées sur l'UI live
+
+- **Date** : 2026-08-25
+- **Contexte** : le Prompt 05 demande que le profil « puisse contenir » langue et devise préférées. Le `LocaleProvider` (Prompt 02/03) pilote déjà la langue de l'interface via `localStorage`, indépendamment de tout compte.
+- **Décision** : `identity_profiles.preferred_language` / `preferred_currency` sont des champs de profil modifiables depuis `/settings`, persistés en base, mais **ne pilotent pas** automatiquement le `LocaleProvider` ni un quelconque routage de devise — ce sont des préférences déclaratives pour l'instant (utile plus tard pour les notifications/SMS localisés, le Prompt 29 multi-devises). Éviter de re-architecturer le système i18n déjà fonctionnel pour un besoin non explicitement demandé.
+- **Statut** : Adopté. Devise limitée à `XOF` (le sélecteur n'a qu'une option) — multi-devises différé au Prompt 29.
+
 ## TODO_DECISION en attente (issues des spécifications de domaine)
 
 Ces points sont explicitement non définis dans les documents source. Ils ne doivent pas être devinés ; ils doivent être tranchés par l'utilisateur au moment où le prompt correspondant les rend bloquants.
@@ -147,7 +169,7 @@ Ces points sont explicitement non définis dans les documents source. Ils ne doi
 |---|---|
 | Identity | Fournisseur SMS pour activer le flux téléphone + OTP (ADR-014) ; biométrie/WebAuthn (non implémentée) ; authentification supplémentaire (step-up) explicite sur nouvel appareil — actuellement seulement journalisée (`new_device_login`), pas bloquante ; politique de complexité mot de passe (au-delà du minimum 8 caractères) ; durée de vie des sessions Supabase (config par défaut non modifiée) ; rate limiting applicatif additionnel au-delà de celui de Supabase Auth |
 | Sécurité (Back Office) | RBAC sur `/admin` — voir ADR-016, **bloquant avant toute mise en production** |
-| User | Processus de changement de numéro de téléphone ; politique de changement du nom légal post-KYC ; portée réelle de la devise préférée |
+| User | Processus de changement de numéro de téléphone ; politique de changement du nom légal post-KYC (les deux restent en lecture seule dans `/settings` pour l'instant) ; intégration d'un fournisseur KYC externe (statut actuellement toujours `unverified`, jamais mis à jour automatiquement) |
 | Payments | Barème complet des frais au-delà de 3,5 %/1000 FCFA ; durée d'expiration des demandes d'argent/QR ; politique de reversal auto vs manuel ; pays/devises additionnels |
 | Audit | Durée de rétention des journaux par juridiction ; liste des actions à double validation ; plateforme de stockage |
 | Observability | Plateforme d'observabilité retenue ; seuils d'alerte ; objectifs RTO/RPO |

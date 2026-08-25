@@ -27,6 +27,7 @@ import {
   Select,
   Skeleton,
   Spinner,
+  Switch,
   Table,
   TableBody,
   TableCell,
@@ -55,6 +56,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 export default function DesignSystemPage() {
   const { t } = useLocale();
   const [loading, setLoading] = useState(false);
+  const [notificationsDemo, setNotificationsDemo] = useState(true);
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-12 px-6 py-10 sm:px-8">
@@ -149,6 +151,19 @@ export default function DesignSystemPage() {
               label="Motif (facultatif)"
               placeholder="Ex. remboursement, cadeau…"
             />
+          </CardContent>
+        </Card>
+      </Section>
+
+      <Section title="Switch">
+        <Card>
+          <CardContent className="flex flex-col gap-4 pt-5">
+            <Switch
+              label={t("settings.preferences.notifications")}
+              checked={notificationsDemo}
+              onCheckedChange={setNotificationsDemo}
+            />
+            <Switch label="Désactivé" disabled />
           </CardContent>
         </Card>
       </Section>
