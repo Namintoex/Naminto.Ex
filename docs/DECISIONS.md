@@ -372,6 +372,15 @@ Format ADR (Architecture Decision Record) léger. Chaque décision liste son con
 - **Statut** : Adopté.
 - **Vérifié empiriquement** : 13 tests (signature/altération/expiration/payload implausible pour `encodeQr`/`verifyQr`, decode→validate→resolve réel contre le vrai projet Supabase pour `BENEFICIARY` et `PREFILLED_PAYMENT`) ; bout-en-bout manuel contre le vrai projet — `PREFILLED_PAYMENT` payé par un second compte réel (transaction settled, montant et frais corrects), `BENEFICIARY` redirigeant vers Send Money avec bénéficiaire pré-vérifié, `PAYMENT_REQUEST` redirigeant vers `/pay/[token]`, QR expiré et QR à signature falsifiée tous deux rejetés avec un message distinct.
 
+## ADR-044 — History : le reçu recalcule débit/crédit comme le Ledger, ne lit pas `transactions.total`
+
+- **Date** : 2026-08-26
+- **Contexte** : le Prompt 16 exige que « le reçu soit cohérent avec le Ledger ». En construisant la page détail (`/history/[reference]`), relire `transactions.total` pour afficher le montant réellement débité de l'expéditeur aurait été trompeur : `createTransaction` (`src/domains/payments/transactions.ts`, Prompt 08) fixe `total = amount + fee` **inconditionnellement**, une formule antérieure au `fee_payer` introduit au Prompt 10 et réellement branché au Prompt 13. Quand `fee_payer = 'recipient'`, le montant réellement débité de l'expéditeur est `amount` (pas `amount + fee`) et le montant réellement crédité au destinataire est `amount - fee` — exactement ce que `recordSettlement` (`src/domains/payments/ledger/record-entries.ts`, Prompt 12) calcule pour les écritures Ledger, mais pas ce que `total` reflète.
+- **Décision** : la page détail et le reçu recalculent `senderDebit`/`recipientCredit` avec la même formule exacte que `recordSettlement`, jamais depuis `total`. `total` reste inchangé en base (aucune migration nécessaire, aucun appelant existant n'en dépendait pour un calcul fee_payer-sensible) — seul son usage pour l'affichage du reçu était concerné.
+- **Trouvé en construisant ce prompt**, pas par relecture de code isolée : en vérifiant manuellement un envoi réel avec `fee_payer = sender` (750 XOF + 26,25 XOF de frais), afficher `total` aurait donné le même résultat par coïncidence (`total = senderDebit` dans ce cas précis) — c'est en écrivant délibérément le test symétrique pour `fee_payer = recipient` que la divergence entre `total` et `senderDebit` réel est devenue visible.
+- **Statut** : Corrigé (dans l'affichage seulement — `transactions.total` n'est pas modifié).
+- **Conséquence** : si un futur écran a besoin d'afficher un montant réellement débité/crédité (au-delà du reçu), il doit utiliser la même formule dérivée de `fee_payer`, pas `total`, sous peine de répéter cette même divergence.
+
 ## TODO_DECISION en attente (issues des spécifications de domaine)
 
 Ces points sont explicitement non définis dans les documents source. Ils ne doivent pas être devinés ; ils doivent être tranchés par l'utilisateur au moment où le prompt correspondant les rend bloquants.
