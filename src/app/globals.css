@@ -171,6 +171,17 @@ body {
   box-sizing: border-box;
 }
 
+/* Scrollbars masquées partout dans l'application — le défilement reste
+   fonctionnel (molette, tactile, clavier), seul l'ascenseur visuel disparaît. */
+* {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* Edge/IE historiques */
+}
+
+*::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Edge Chromium */
+}
+
 a {
   color: inherit;
 }
