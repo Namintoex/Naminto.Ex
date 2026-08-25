@@ -196,6 +196,7 @@ export interface Database {
           source_reference: string | null;
           destination_type: DestinationType;
           destination_reference: string | null;
+          destination_external_reference: string | null;
           provider: Provider | null;
           amount: number;
           currency: string;
@@ -217,6 +218,7 @@ export interface Database {
           source_reference?: string | null;
           destination_type: DestinationType;
           destination_reference?: string | null;
+          destination_external_reference?: string | null;
           provider?: Provider | null;
           amount: number;
           currency?: string;

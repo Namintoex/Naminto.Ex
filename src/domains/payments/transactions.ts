@@ -25,6 +25,10 @@ export interface CreateTransactionParams {
   sourceReference: string | null;
   destinationType: DestinationType;
   destinationReference: string | null;
+  /** Référence texte libre d'un bénéficiaire externe (ex. numéro de
+   *  téléphone) quand destinationType = 'external' — distincte de
+   *  destinationReference (uuid, réservé aux comptes liés). */
+  destinationExternalReference?: string | null;
   provider: Provider | null;
   amount: number;
   currency?: string;
@@ -81,6 +85,7 @@ export async function createTransaction(params: CreateTransactionParams) {
       source_reference: params.sourceReference,
       destination_type: params.destinationType,
       destination_reference: params.destinationReference,
+      destination_external_reference: params.destinationExternalReference ?? null,
       provider: params.provider,
       amount: params.amount,
       currency: params.currency ?? "XOF",

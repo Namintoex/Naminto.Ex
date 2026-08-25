@@ -20,6 +20,7 @@ export async function calculateFee(request: PaymentRequest, route: ResolvedRoute
       destinationType: request.destinationType,
       provider: route.provider,
       transactionType: "send",
+      feePayerOverride: request.feePayerOverride,
     });
   } catch (err) {
     throw new OrchestratorError("SYSTEM_ERROR", `Fee Engine: ${(err as Error).message}`);

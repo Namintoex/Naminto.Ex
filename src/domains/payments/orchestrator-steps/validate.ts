@@ -39,6 +39,12 @@ export function validateRequest(request: PaymentRequest): void {
       "destinationLinkedAccountId requis quand destinationType = linked_account"
     );
   }
+  if (request.destinationType === "external" && !request.destinationExternalReference) {
+    throw new OrchestratorError(
+      "VALIDATION_ERROR",
+      "destinationExternalReference requis quand destinationType = external"
+    );
+  }
   if (request.destinationType === "naminto_wallet" && !request.recipientUserId) {
     throw new OrchestratorError(
       "VALIDATION_ERROR",

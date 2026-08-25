@@ -260,8 +260,22 @@ Domaine implémenté dans `src/domains/accounts/`, page `/accounts` (`src/app/(u
 - **Accès** : lecture seule cliente, restreinte au propre portefeuille de l'utilisateur (`owner_type = 'user_wallet' AND owner_id = auth.uid()`) sur les deux tables ; aucune policy d'écriture cliente.
 - **Non couvert à ce stade** : déclenchement de `recordReversal`/`recordRefund` depuis un flux utilisateur ou administratif réel (aucun écran de litige/remboursement n'existe encore — attend un prompt ultérieur) ; solde de portefeuille consultable par l'utilisateur (les écritures existent, aucune UI ne les agrège encore — `/admin/ledger` reste « Bientôt disponible »).
 
-## 24. Prochaines étapes
+## 24. Send Money (Prompt 13)
+
+`src/app/(user)/send/` (UI) + `src/domains/payments/actions.ts` (Server Actions) — premier flux utilisateur réel appelant le Payment Orchestrator (Prompts 09-12). Aucune logique financière côté client : chaque montant affiché avant confirmation vient d'un appel serveur au Fee Engine, jamais d'un calcul local.
+
+- **Parcours** (`send-money-wizard.tsx`, assistant à 5 étapes) : Bénéficiaire (interne Naminto.Ex par identifiant, ou externe via un compte lié) → Montant + Frais (aperçu en direct) + Payeur des frais → Authentification (PIN) → Récapitulatif (Montant, Frais, Total débité, Montant reçu, Bénéficiaire, Réseau — tous exigés par le Prompt 13) → Confirmation explicite → Exécution → Reçu. Risk/Limits n'ont pas d'écran dédié : ils s'exécutent à l'intérieur du Payment Orchestrator au moment de la confirmation, comme le prévoit le diagramme du Prompt 09.
+- **Deux combinaisons supportées**, les seules couvertes bout-en-bout par l'orchestrateur (Prompts 09-11) : `naminto_wallet → naminto_wallet` (bénéficiaire résolu par `findRecipientByNamintoId`, Identity) et `linked_account → external` (débit d'un compte lié du sender, bénéficiaire externe identifié par un numéro en texte libre). Voir `docs/DECISIONS.md` ADR-041 pour les combinaisons volontairement non exposées dans cette UI.
+- **`feePayerOverride` enfin branché** : le choix « qui paie les frais ? » de l'écran Montant atteint désormais réellement le Fee Engine (`PaymentRequest.feePayerOverride`, propagé par `orchestrator-steps/fee.ts`) — jusqu'ici la règle par défaut s'appliquait toujours, faute d'appelant (voir ADR-034, Prompt 10, et ADR-041).
+- **Bénéficiaire externe** (`supabase/migrations/0009_send_money.sql`) : `transactions.destination_external_reference` (texte libre) — distinct de `destination_reference` (uuid, réservé aux comptes liés) puisqu'un bénéficiaire externe n'a par définition aucune ligne `linked_accounts`. Bug corrigé au passage : `destination_reference` valait toujours `destinationLinkedAccountId`, jamais renseigné pour une destination externe (voir ADR-041).
+- **QR** : mentionné dans le parcours source, mais aucune capture caméra n'est implémentée à ce stade (non testable dans cet environnement) — l'identifiant Naminto.Ex se saisit en texte pour l'instant, marqué « bientôt disponible » dans l'UI. La règle « un scan QR ne doit jamais exécuter automatiquement » est de toute façon respectée : aucune action ne s'exécute sans passer par le Récapitulatif et sa confirmation explicite.
+- **Double clic / rejeu** : l'`idempotencyKey` (UUID) est générée une seule fois côté client à l'entrée du Récapitulatif et conservée pour tout rejeu (double clic sur Confirmer, retry après erreur) — jamais régénérée tant que l'utilisateur ne recommence pas un nouvel envoi depuis le début.
+- **Vérification du bénéficiaire** : `findRecipientByNamintoId` (`src/domains/identity/queries.ts`) résout un `naminto_id` en nom affichable via `service_role` (RLS restreint `identity_profiles` au titulaire) — ne renvoie jamais que le strict nécessaire à la confirmation (jamais le téléphone, le statut KYC…).
+- **Vérifié manuellement contre le vrai projet Supabase** : envoi interne réglé de bout en bout (statut `settled`, écritures Ledger équilibrées vérifiées en base), aperçu de frais réactif au changement de payeur, état vide pour l'étape « compte lié » sans compte actif, échec PIN affichant le message spécifique (`pin.error.invalid`) plutôt qu'une erreur générique.
+- **Non couvert à ce stade** : envoi `naminto_wallet → external` ou `linked_account → naminto_wallet` (combinaisons non exercées par l'orchestrateur existant — TODO_DECISION, voir ADR-041) ; scan QR réel ; page `/history` (toujours « Bientôt disponible », Prompt à venir).
+
+## 25. Prochaines étapes
 
 Conformément au protocole, les prompts sont exécutés un par un avec validation entre chaque étape :
 
-- **Prompt 13** — à confirmer avec l'utilisateur avant de commencer.
+- **Prompt 14** — à confirmer avec l'utilisateur avant de commencer.

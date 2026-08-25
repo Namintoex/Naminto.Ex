@@ -108,7 +108,10 @@ export async function runPaymentOrchestrator(request: PaymentRequest): Promise<O
       sourceType: request.sourceType,
       sourceReference: request.sourceLinkedAccountId,
       destinationType: request.destinationType,
-      destinationReference: request.destinationLinkedAccountId,
+      destinationReference:
+        request.destinationType === "linked_account" ? request.destinationLinkedAccountId : null,
+      destinationExternalReference:
+        request.destinationType === "external" ? request.destinationExternalReference : null,
       provider: route.provider,
       amount: request.amount,
       currency: request.currency,

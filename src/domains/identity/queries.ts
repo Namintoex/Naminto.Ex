@@ -41,6 +41,31 @@ export async function getSecurityEvents(userId: string, limit = 20) {
   return data ?? [];
 }
 
+export interface RecipientLookup {
+  userId: string;
+  namintoId: string;
+  legalName: string;
+}
+
+/**
+ * Résout un bénéficiaire Naminto.Ex par son identifiant public — utilisé
+ * par Send Money (Prompt 13) pour l'étape « Vérification » du
+ * bénéficiaire. `identity_profiles` n'a qu'une policy RLS restreinte au
+ * titulaire (migration 0001) : cette résolution passe donc par
+ * `service_role`, et ne renvoie jamais que le strict minimum nécessaire
+ * à la confirmation d'un envoi (jamais le téléphone, le statut KYC, etc.).
+ */
+export async function findRecipientByNamintoId(namintoId: string): Promise<RecipientLookup | null> {
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("identity_profiles")
+    .select("user_id, naminto_id, legal_name")
+    .eq("naminto_id", namintoId.trim().toLowerCase())
+    .maybeSingle();
+  if (!data) return null;
+  return { userId: data.user_id, namintoId: data.naminto_id, legalName: data.legal_name };
+}
+
 /**
  * La table pin_credentials n'a aucune policy SELECT (voir migration
  * 0001_identity.sql) — même le titulaire ne peut pas lire son propre hash.

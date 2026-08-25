@@ -47,6 +47,7 @@ describe("Payment Orchestrator (intégration)", () => {
       sourceLinkedAccountId: null,
       destinationType: "external",
       destinationLinkedAccountId: null,
+      destinationExternalReference: "+225070000001",
       amount: 5_000,
       currency: "XOF",
       pin,
@@ -135,13 +136,15 @@ describe("Payment Orchestrator (intégration)", () => {
     expect(Number(transaction.fee)).toBeCloseTo(175); // 5000 * 3.5%
 
     // Relit depuis la base (pas seulement la valeur renvoyée en mémoire)
-    // pour prouver que provider_transaction_id est bien persisté.
+    // pour prouver que provider_transaction_id et la référence du
+    // bénéficiaire externe (Send Money, Prompt 13) sont bien persistés.
     const { data: persisted } = await admin
       .from("transactions")
-      .select("provider_transaction_id")
+      .select("provider_transaction_id, destination_external_reference")
       .eq("id", transaction.id)
       .single();
     expect(persisted?.provider_transaction_id).toBe(transaction.provider_transaction_id);
+    expect(persisted?.destination_external_reference).toBe(request.destinationExternalReference);
 
     const { data: events } = await admin
       .from("transaction_status_events")
@@ -174,6 +177,36 @@ describe("Payment Orchestrator (intégration)", () => {
     expect(transaction.status).toBe("settled");
     expect(transaction.provider_transaction_id).toBeNull();
     expect(transaction.recipient_user_id).toBe(recipientUserId);
+  });
+
+  it("feePayerOverride (Send Money, Prompt 13) est propagé jusqu'au Fee Engine et persisté", async () => {
+    const request = baseRequest({
+      sourceType: "naminto_wallet",
+      destinationType: "naminto_wallet",
+      recipientUserId,
+      amount: 2_000,
+      feePayerOverride: "recipient",
+    });
+
+    const { transaction } = await runPaymentOrchestrator(request);
+    createdTransactionIds.push(transaction.id);
+
+    expect(transaction.fee_payer).toBe("recipient");
+  });
+
+  it("VALIDATION_ERROR : destinataire externe sans référence, aucune transaction créée", async () => {
+    const request = baseRequest({ destinationExternalReference: null });
+
+    await expect(runPaymentOrchestrator(request)).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+    } satisfies Partial<OrchestratorError>);
+
+    const { data } = await admin
+      .from("transactions")
+      .select("id")
+      .eq("idempotency_key", request.idempotencyKey)
+      .maybeSingle();
+    expect(data).toBeNull();
   });
 
   it("VALIDATION_ERROR : montant invalide, aucune transaction créée", async () => {
