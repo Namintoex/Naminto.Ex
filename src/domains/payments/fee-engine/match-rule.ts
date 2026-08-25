@@ -1,4 +1,5 @@
 import type { Database } from "@/lib/supabase/database.types";
+import { pickMostSpecific } from "../shared/pick-most-specific";
 import type { FeeCalculationInput } from "./types";
 
 export type FeeRule = Database["public"]["Tables"]["fee_rules"]["Row"];
@@ -42,16 +43,15 @@ export function ruleSpecificity(rule: FeeRule): number {
 }
 
 /**
- * Retient la règle la plus spécifique parmi celles qui correspondent.
- * En cas d'égalité, la règle créée en premier est conservée (ordre
- * stable, déterministe) — aucune règle réelle ne devrait produire
- * d'égalité en pratique.
+ * Retient la règle la plus spécifique parmi celles qui correspondent
+ * (voir shared/pick-most-specific.ts). En cas d'égalité, la première
+ * règle rencontrée est conservée — aucune règle réelle ne devrait
+ * produire d'égalité en pratique.
  */
 export function pickMostSpecificRule(rules: FeeRule[], input: FeeCalculationInput): FeeRule | null {
-  const matching = rules.filter((rule) => rule.active && ruleMatches(rule, input));
-  if (matching.length === 0) return null;
-
-  return matching.reduce((best, current) =>
-    ruleSpecificity(current) > ruleSpecificity(best) ? current : best
+  return pickMostSpecific(
+    rules,
+    (rule) => rule.active && ruleMatches(rule, input),
+    ruleSpecificity
   );
 }

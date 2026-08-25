@@ -284,6 +284,32 @@ Format ADR (Architecture Decision Record) léger. Chaque décision liste son con
 - **Accès** : aucune policy RLS cliente sur `fee_rules` — lecture/écriture réservées au `service_role`, faute d'UI Back Office de tarification (Prompt 22).
 - **Vérifié empiriquement** (tests d'intégration) : le taux de repli à plusieurs montants (1000/5000/10000/250000 FCFA), `feePayerOverride`, une règle fournisseur plus spécifique l'emportant sur le taux générique, le respect d'une plage de montant, et l'absence de règle correspondante (devise inconnue) levant `NoMatchingFeeRuleError`.
 
+## ADR-035 — Utilitaire `pickMostSpecific` partagé entre Fee Engine et Limit Engine
+
+- **Date** : 2026-08-25
+- **Contexte** : Fee Engine (Prompt 10) et Limit Engine (Prompt 11) partagent exactement le même principe de résolution — parmi les règles configurables qui correspondent à une requête, retenir la plus spécifique.
+- **Décision** : extraction dans `src/domains/payments/shared/pick-most-specific.ts` (générique, `<T>`), réutilisé par `fee-engine/match-rule.ts` (refactorisé sans changement de comportement, 18 tests existants toujours au vert) et `limit-engine/match-rule.ts`. La logique de correspondance elle-même (`ruleMatches`, dimensions différentes par moteur) reste propre à chaque domaine — seul le « retenir le plus spécifique » est partagé.
+- **Statut** : Adopté.
+
+## ADR-036 — Limit Engine : table vide au départ, absence de règle ≠ refus
+
+- **Date** : 2026-08-25
+- **Contexte** : contrairement au Fee Engine (taux 3,5 % documenté), aucune valeur de limite n'est définie dans les documents source du projet.
+- **Décision** : `limit_rules` (`supabase/migrations/0007_limit_rules.sql`) n'est semée d'aucune règle. Le Limit Engine traite l'absence de règle pour un type donné comme « aucune contrainte », jamais comme un refus — conforme à la règle du Master Prompt « si une information n'est pas définie, ne l'invente pas ». Quatre types de limite supportés : `per_transaction_amount`, `daily_amount`, `monthly_amount` (cumul sur la période calendaire courante, UTC), `frequency_count` (nombre d'opérations sur une fenêtre glissante configurable en heures). Chaque règle peut se spécialiser par pays/devise/statut KYC/fournisseur/type de transaction/palier utilisateur (mêmes jokers NULL que `fee_rules`).
+- **Décision explicable** : `checkLimits` retourne `{ allowed, violations[] }` où chaque violation détaille la règle, le plafond et l'usage projeté — jamais un simple booléen opaque, conformément à l'exigence explicite du Prompt 11.
+- **Calcul de l'usage** : lit directement `transactions` (statuts exclus : `failed`/`rejected`/`cancelled`/`expired` — tout le reste, y compris les statuts en cours, compte, de façon volontairement conservatrice).
+- **Jamais de blocage frontend uniquement** : le moteur s'exécute exclusivement côté serveur (Payment Orchestrator, `service_role`) — aucune policy RLS cliente sur `limit_rules`.
+- **Statut** : Adopté.
+- **Vérifié empiriquement** : absence de règle toujours autorisée ; refus par `per_transaction_amount` avec décision explicable ; `daily_amount` tenant compte de l'usage réellement réglé ; `frequency_count` refusant après N opérations réelles sur la fenêtre ; une règle KYC-spécifique l'emportant sur la règle générique ; bout-en-bout dans l'orchestrateur (`LIMIT_ERROR` → transaction `failed`).
+
+## ADR-037 — Tests d'intégration en série (`fileParallelism: false`)
+
+- **Date** : 2026-08-25
+- **Contexte** : `fee_rules` et `limit_rules` sont des configurations **globales**, non scopées par utilisateur. Vitest exécute les fichiers de test en parallèle par défaut ; une règle temporaire posée par un fichier peut donc fausser un test d'un autre fichier tournant au même instant contre le même projet Supabase partagé.
+- **Décision** : `fileParallelism: false` dans `vitest.config.mts`. Les fichiers de test s'exécutent en série (plus lent, ~80 s pour 64 tests contre ~40 s en parallèle) mais sans interférence.
+- **Statut** : Adopté.
+- **Trouvé et corrigé pendant la vérification** : le test « portefeuille → portefeuille » de `orchestrator.test.ts` échouait par intermittence avec `LIMIT_ERROR`, provoqué par la règle `frequency_count` temporaire du test `check-limits.test.ts` exécuté en parallèle sur un utilisateur totalement différent — pas un bug du Limit Engine lui-même, mais une leçon sur l'isolation des tests d'intégration face à une configuration globale partagée.
+
 ## TODO_DECISION en attente (issues des spécifications de domaine)
 
 Ces points sont explicitement non définis dans les documents source. Ils ne doivent pas être devinés ; ils doivent être tranchés par l'utilisateur au moment où le prompt correspondant les rend bloquants.
@@ -293,7 +319,7 @@ Ces points sont explicitement non définis dans les documents source. Ils ne doi
 | Identity | Fournisseur SMS pour activer le flux téléphone + OTP (ADR-014) ; biométrie/WebAuthn (non implémentée) ; authentification supplémentaire (step-up) explicite sur nouvel appareil — actuellement seulement journalisée (`new_device_login`), pas bloquante ; politique de complexité mot de passe (au-delà du minimum 8 caractères) ; durée de vie des sessions Supabase (config par défaut non modifiée) ; rate limiting applicatif additionnel au-delà de celui de Supabase Auth |
 | Sécurité (Back Office) | RBAC sur `/admin` — voir ADR-016, **bloquant avant toute mise en production** |
 | User | Processus de changement de numéro de téléphone ; politique de changement du nom légal post-KYC (les deux restent en lecture seule dans `/settings` pour l'instant) ; intégration d'un fournisseur KYC externe (statut actuellement toujours `unverified`, jamais mis à jour automatiquement) |
-| Payments | Barème dégressif réel au-delà du taux de repli 3,5 %/1000 FCFA (la table `fee_rules` le permet, mais aucune règle par palier n'est encore saisie) ; notion de `user_tier` (colonne prête, aucun palier utilisateur n'existe encore côté User) ; durée d'expiration des demandes d'argent/QR ; politique de reversal auto vs manuel ; pays/devises additionnels ; workflow de résolution d'un statut `disputed` (ADR-027) |
+| Payments | Barème dégressif réel au-delà du taux de repli 3,5 %/1000 FCFA (la table `fee_rules` le permet, mais aucune règle par palier n'est encore saisie) ; **valeurs réelles des limites** (`limit_rules` est vide — table prête mais aucun plafond journalier/mensuel/par transaction/de fréquence n'est configuré, **bloquant avant toute mise en production réelle**) ; notion de `user_tier` (colonne prête, aucun palier utilisateur n'existe encore côté User) ; durée d'expiration des demandes d'argent/QR ; politique de reversal auto vs manuel ; pays/devises additionnels ; workflow de résolution d'un statut `disputed` (ADR-027) |
 | Audit | Durée de rétention des journaux par juridiction ; liste des actions à double validation ; plateforme de stockage |
 | Observability | Plateforme d'observabilité retenue ; seuils d'alerte ; objectifs RTO/RPO |
 | Accounts / Providers | Adapters REAL pour Orange/MTN/Moov/Wave/cartes — identifiants API, contrats, endpoints à obtenir auprès de chaque fournisseur (bloquant pour toute mise en production) ; vérification de signature webhook réelle et persistance (Prompt 25) ; détection automatique `connection_expired`/`provider_unavailable` (Availability Engine, Prompt 47) |

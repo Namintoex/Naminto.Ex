@@ -236,8 +236,19 @@ Domaine implémenté dans `src/domains/accounts/`, page `/accounts` (`src/app/(u
 - **Accès** : aucune policy RLS cliente sur `fee_rules` — lecture/écriture réservées au `service_role`, faute d'UI Back Office de tarification (Prompt 22).
 - **Non couvert à ce stade** : `user_tier` (colonne prête, aucun palier utilisateur réel côté User) ; barème dégressif par palier de montant (la table le permet, aucune règle de ce type n'est encore saisie) ; UI de gestion des règles (Prompt 22, Back Office Pricing).
 
-## 22. Prochaines étapes
+## 22. Limit Engine (Prompt 11)
+
+`src/domains/payments/limit-engine/` — domaine indépendant, même principe de configuration que le Fee Engine, réutilise l'utilitaire partagé `shared/pick-most-specific.ts` (voir `docs/DECISIONS.md` ADR-035).
+
+- **Schéma** (`supabase/migrations/0007_limit_rules.sql`) : `limit_rules`, quatre types (`per_transaction_amount`, `daily_amount`, `monthly_amount`, `frequency_count`), dimensions de correspondance jokers (`country`, `currency`, `kyc_status`, `provider`, `transaction_type`, `user_tier`). **Table vide au départ** — aucune valeur de limite n'est documentée dans les sources du projet ; absence de règle = absence de contrainte, jamais un refus (voir ADR-036).
+- **Usage réel** (`usage-queries.ts`) : lit `transactions` pour calculer le cumul journalier/mensuel (période calendaire UTC) ou la fréquence (fenêtre glissante configurable) de l'utilisateur, en excluant les statuts qui ne représentent jamais un usage réel (`failed`/`rejected`/`cancelled`/`expired`).
+- **Décision explicable** : `checkLimits` retourne `{ allowed, violations[] }`, chaque violation détaillant la règle, le plafond et l'usage projeté — jamais un booléen opaque.
+- **Branché sur l'orchestrateur** : `orchestrator-steps/limits.ts` délègue entièrement au Limit Engine ; s'exécute exclusivement côté serveur (aucun blocage frontend uniquement, exigence explicite du Prompt 11).
+- **Accès** : aucune policy RLS cliente sur `limit_rules` — `service_role` uniquement, faute d'UI Back Office (Prompt 22).
+- **Non couvert à ce stade** : **aucune valeur de limite réelle configurée** (bloquant avant mise en production) ; `user_tier` (même limitation que le Fee Engine) ; UI de gestion des règles.
+
+## 23. Prochaines étapes
 
 Conformément au protocole, les prompts sont exécutés un par un avec validation entre chaque étape :
 
-- **Prompt 11** — Limit Engine (limites journalières, mensuelles, par transaction, par fréquence — configurables par utilisateur/KYC/pays/devise, remplaçant le STUB `checkLimits` posé au Prompt 09).
+- **Prompt 12** — Ledger (écritures comptables append-only, comptes, débit/crédit — remplaçant le STUB `writeLedgerEntries` posé au Prompt 09).

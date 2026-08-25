@@ -10,6 +10,17 @@ export default defineConfig({
     // vers le vrai projet Supabase (transitions de State Machine, appels
     // du Provider Gateway) — le délai par défaut de 5s est trop court.
     testTimeout: 30_000,
+    // Plusieurs suites d'intégration écrivent une configuration GLOBALE
+    // (fee_rules, limit_rules — non scopée par utilisateur) dans le même
+    // projet Supabase partagé. Exécuter les fichiers de test en parallèle
+    // permettrait à la règle temporaire d'un fichier de fausser le
+    // résultat d'un autre fichier tournant au même instant (vécu
+    // concrètement : une règle frequency_count posée par
+    // limit-engine/check-limits.test.ts a fait échouer un test
+    // d'orchestrator.test.ts exécuté en parallèle). Les fichiers tournent
+    // donc en série ; chaque fichier nettoie déjà sa propre config après
+    // chaque test (afterEach).
+    fileParallelism: false,
   },
   resolve: {
     alias: {

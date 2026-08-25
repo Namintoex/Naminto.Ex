@@ -136,7 +136,7 @@ export async function runPaymentOrchestrator(request: PaymentRequest): Promise<O
     // → Risk → Compliance → Limits (Fee et Routing déjà résolus ci-dessus)
     await checkRisk(request);
     await checkCompliance(request);
-    await checkLimits(request);
+    await checkLimits(request, route);
 
     // → Provider Gateway (ignoré si virement portefeuille à portefeuille pur)
     let providerTransactionId: string | null = null;

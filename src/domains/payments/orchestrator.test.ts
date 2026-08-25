@@ -220,6 +220,38 @@ describe("Payment Orchestrator (intégration)", () => {
     expect(tx?.status).toBe("failed");
   });
 
+  it("LIMIT_ERROR : refusé par une règle du Limit Engine, la transaction se termine en failed", async () => {
+    const { data: rule, error } = await admin
+      .from("limit_rules")
+      .insert({ limit_type: "per_transaction_amount", max_amount: 1_000, currency: "XOF" })
+      .select("id")
+      .single();
+    if (error || !rule) throw new Error(`Setup de la règle de test échoué: ${error?.message}`);
+
+    try {
+      const request = baseRequest({ amount: 2_000 });
+
+      let caught: unknown;
+      try {
+        await runPaymentOrchestrator(request);
+      } catch (err) {
+        caught = err;
+      }
+      expect(caught).toBeInstanceOf(OrchestratorError);
+      expect((caught as OrchestratorError).code).toBe("LIMIT_ERROR");
+
+      const { data: tx } = await admin
+        .from("transactions")
+        .select("id, status")
+        .eq("idempotency_key", request.idempotencyKey)
+        .single();
+      if (tx) createdTransactionIds.push(tx.id);
+      expect(tx?.status).toBe("failed");
+    } finally {
+      await admin.from("limit_rules").delete().eq("id", rule.id);
+    }
+  });
+
   it("PROVIDER_ERROR : solde SANDBOX insuffisant, la transaction se termine en failed", async () => {
     const linkedAccountId = await linkSandboxAccount(`+22508${randomUUID().slice(0, 8)}`);
 

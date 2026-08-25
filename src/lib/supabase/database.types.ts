@@ -22,6 +22,7 @@ export type SourceType = "naminto_wallet" | "linked_account";
 export type DestinationType = "naminto_wallet" | "linked_account" | "external";
 export type FeePayer = "sender" | "recipient";
 export type FeeTransactionType = "send" | "request";
+export type LimitType = "per_transaction_amount" | "daily_amount" | "monthly_amount" | "frequency_count";
 
 export interface Database {
   public: {
@@ -293,6 +294,52 @@ export interface Database {
           rate_percent: number;
           flat_fee: number;
           fee_payer: FeePayer;
+          active: boolean;
+        }>;
+        Relationships: [];
+      };
+      limit_rules: {
+        Row: {
+          id: string;
+          limit_type: LimitType;
+          max_amount: number | null;
+          max_count: number | null;
+          period_hours: number | null;
+          country: string | null;
+          currency: string | null;
+          kyc_status: KycStatus | null;
+          provider: Provider | null;
+          transaction_type: FeeTransactionType | null;
+          user_tier: string | null;
+          active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          limit_type: LimitType;
+          max_amount?: number | null;
+          max_count?: number | null;
+          period_hours?: number | null;
+          country?: string | null;
+          currency?: string | null;
+          kyc_status?: KycStatus | null;
+          provider?: Provider | null;
+          transaction_type?: FeeTransactionType | null;
+          user_tier?: string | null;
+          active?: boolean;
+        };
+        Update: Partial<{
+          limit_type: LimitType;
+          max_amount: number | null;
+          max_count: number | null;
+          period_hours: number | null;
+          country: string | null;
+          currency: string | null;
+          kyc_status: KycStatus | null;
+          provider: Provider | null;
+          transaction_type: FeeTransactionType | null;
+          user_tier: string | null;
           active: boolean;
         }>;
         Relationships: [];
