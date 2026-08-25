@@ -181,8 +181,19 @@ Domaine implémenté dans `src/domains/user/`, sur la même table `identity_prof
 - **Nouveau composant Design System** : `Switch` (`@radix-ui/react-switch`), ajouté à `/design-system` et utilisé pour les préférences booléennes.
 - **Non couvert à ce stade** : intégration d'un fournisseur KYC réel (le statut reste `unverified` pour tous les comptes), changement de numéro de téléphone ou de nom légal (champs en lecture seule), gestion des bénéficiaires/contacts (non mentionnée explicitement dans le Prompt 05 officiel — reportée sans decision à prendre pour l'instant).
 
-## 17. Prochaines étapes
+## 17. Linked Accounts (Prompt 06)
+
+Domaine implémenté dans `src/domains/accounts/`, page `/accounts` (`src/app/(user)/accounts/`).
+
+- **Schéma** (`supabase/migrations/0003_accounts.sql`, corrigé par `0004_accounts_reconnect.sql`) : `linked_accounts` (provider, external_reference, status, capabilities, consent_status, timestamps). Index unique **partiel** sur (user_id, provider, external_reference) excluant les lignes déliées, pour permettre la reconnexion sans dupliquer l'historique.
+- **Statuts** : `active | connection_expired | verification_required | suspended | unlinked | provider_unavailable` (repris de la section 10 de l'architecture générale). La déliaison est un soft-delete (`status = 'unlinked'`, `consent_status = 'revoked'`) — jamais une suppression physique.
+- **Fournisseurs préparés** (`src/domains/accounts/providers.ts`) : Orange, MTN, Moov, Wave, carte prépayée — avec capacités statiques provisoires (`balance`, `transfer`, `receive`), destinées à devenir dynamiques via le registre d'adapters du Provider Gateway (Prompt 07).
+- **Aucune fausse intégration financière** (voir `docs/DECISIONS.md` ADR-020) : le flux de liaison affiche un avertissement explicite « Démonstration — aucune connexion réelle » et un écran de consentement (ce que Naminto.Ex pourra consulter / faire / ne fera jamais). Aucun solde simulé — chaque carte affiche « Solde indisponible » plutôt qu'un chiffre inventé. Aucun PIN ni identifiant fournisseur sensible n'est demandé ; la référence externe est toujours masquée à l'affichage.
+- **Audit** : `account_linked`, `account_reconnected`, `account_unlinked` journalisés dans `security_events` (même mécanisme que les domaines Identity et User).
+- **Non couvert à ce stade** : toute connexion réelle à un fournisseur (bloquant jusqu'au Prompt 07), synchronisation de solde, détection automatique d'expiration de connexion (`connection_expired`, `provider_unavailable` — nécessitent l'Availability Engine du Prompt 47).
+
+## 18. Prochaines étapes
 
 Conformément au protocole, les prompts sont exécutés un par un avec validation entre chaque étape :
 
-- **Prompt 06** — Linked Accounts (comptes liés : Orange, MTN, Moov, Wave, cartes prépayées).
+- **Prompt 07** — Provider Gateway (abstraction fournisseurs, adapters SANDBOX).

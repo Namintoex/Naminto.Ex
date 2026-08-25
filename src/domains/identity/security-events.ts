@@ -14,7 +14,10 @@ export type SecurityEventType =
   | "device_added"
   | "device_revoked"
   | "new_device_login"
-  | "preferences_updated";
+  | "preferences_updated"
+  | "account_linked"
+  | "account_reconnected"
+  | "account_unlinked";
 
 /**
  * Écrit un événement de sécurité append-only. Utilise toujours le client

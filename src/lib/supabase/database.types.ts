@@ -8,6 +8,15 @@ export type IdentityStatus = "pending_verification" | "active" | "suspended" | "
 export type DeviceStatus = "active" | "untrusted" | "revoked";
 export type KycStatus = "unverified" | "pending" | "verified" | "rejected" | "requires_action";
 export type Locale = "fr" | "en";
+export type Provider = "orange" | "mtn" | "moov" | "wave" | "prepaid_card";
+export type LinkedAccountStatus =
+  | "active"
+  | "connection_expired"
+  | "verification_required"
+  | "suspended"
+  | "unlinked"
+  | "provider_unavailable";
+export type ConsentStatus = "granted" | "revoked" | "pending";
 
 export interface Database {
   public: {
@@ -128,6 +137,43 @@ export interface Database {
           ip_hash?: string | null;
           metadata?: Record<string, unknown>;
         };
+        Relationships: [];
+      };
+      linked_accounts: {
+        Row: {
+          id: string;
+          user_id: string;
+          provider: Provider;
+          external_reference: string;
+          status: LinkedAccountStatus;
+          capabilities: string[];
+          consent_status: ConsentStatus;
+          linked_at: string;
+          last_synced_at: string | null;
+          unlinked_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          provider: Provider;
+          external_reference: string;
+          status?: LinkedAccountStatus;
+          capabilities?: string[];
+          consent_status?: ConsentStatus;
+          linked_at?: string;
+          last_synced_at?: string | null;
+          unlinked_at?: string | null;
+        };
+        Update: Partial<{
+          status: LinkedAccountStatus;
+          capabilities: string[];
+          consent_status: ConsentStatus;
+          linked_at: string;
+          last_synced_at: string | null;
+          unlinked_at: string | null;
+        }>;
         Relationships: [];
       };
     };

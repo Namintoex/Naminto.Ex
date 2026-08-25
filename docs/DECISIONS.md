@@ -161,6 +161,25 @@ Format ADR (Architecture Decision Record) léger. Chaque décision liste son con
 - **Décision** : `identity_profiles.preferred_language` / `preferred_currency` sont des champs de profil modifiables depuis `/settings`, persistés en base, mais **ne pilotent pas** automatiquement le `LocaleProvider` ni un quelconque routage de devise — ce sont des préférences déclaratives pour l'instant (utile plus tard pour les notifications/SMS localisés, le Prompt 29 multi-devises). Éviter de re-architecturer le système i18n déjà fonctionnel pour un besoin non explicitement demandé.
 - **Statut** : Adopté. Devise limitée à `XOF` (le sélecteur n'a qu'une option) — multi-devises différé au Prompt 29.
 
+## ADR-020 — Accounts : liaison simulée en attendant le Provider Gateway (Prompt 07)
+
+- **Date** : 2026-08-25
+- **Contexte** : le Prompt 06 (Linked Accounts) précède le Prompt 07 (Provider Gateway) dans le protocole — aucun adapter fournisseur réel n'existe encore. Le Master Prompt interdit explicitement toute fausse intégration financière présentée comme réelle (« Zero fausse intégration financière »).
+- **Décision** :
+  - `linked_accounts` (`supabase/migrations/0003_accounts.sql`) stocke provider, référence externe, statut, capabilities (statiques pour l'instant), consent_status et timestamps — le modèle de données complet attendu par le Prompt 06.
+  - Le flux de liaison affiche un avertissement explicite (« Démonstration — aucune connexion réelle ») et un écran de consentement détaillant ce que Naminto.Ex pourra/ne pourra jamais faire, conformément à la section 11 de l'architecture générale.
+  - Aucun solde n'est simulé ou inventé : chaque carte affiche « Solde indisponible — fournisseur non connecté » plutôt qu'un chiffre fictif.
+  - Aucun PIN ni identifiant fournisseur sensible n'est demandé — seule une référence (ex. numéro de téléphone) est saisie, toujours masquée à l'affichage (`maskExternalReference`, derniers 4 chiffres uniquement).
+- **Statut** : Adopté. À reconnecter au vrai Provider Gateway lors du Prompt 07 (le statut `active` deviendra alors le résultat d'un appel réel à l'adapter, pas une valeur posée directement par le client).
+
+## ADR-021 — Reconnexion : index unique partiel plutôt que suppression physique
+
+- **Date** : 2026-08-25
+- **Contexte** : le Prompt 06 exige explicitement la « reconnexion » d'un compte précédemment délié. La déliaison est un soft-delete (`status = 'unlinked'`), et la contrainte unique initiale (`user_id, provider, external_reference`) bloquait toute nouvelle liaison avec la même référence.
+- **Décision** : remplacement par un index unique **partiel** (`where status <> 'unlinked'`, `supabase/migrations/0004_accounts_reconnect.sql`) — une seule ligne active par (utilisateur, fournisseur, référence), mais l'historique délié n'empêche pas une reconnexion. `linkAccountAction` détecte une ligne déliée existante et la réactive (même `id`, `linked_at` rafraîchi) au lieu d'en créer une seconde, journalisée comme `account_reconnected` (distinct de `account_linked`).
+- **Statut** : Adopté.
+- **Trouvé et corrigé pendant la vérification** : la première implémentation (contrainte unique simple) aurait renvoyé à tort « déjà lié » lors d'une tentative de reconnexion légitime — repéré en testant réellement le scénario contre la base, pas seulement en relisant le code.
+
 ## TODO_DECISION en attente (issues des spécifications de domaine)
 
 Ces points sont explicitement non définis dans les documents source. Ils ne doivent pas être devinés ; ils doivent être tranchés par l'utilisateur au moment où le prompt correspondant les rend bloquants.
@@ -173,6 +192,7 @@ Ces points sont explicitement non définis dans les documents source. Ils ne doi
 | Payments | Barème complet des frais au-delà de 3,5 %/1000 FCFA ; durée d'expiration des demandes d'argent/QR ; politique de reversal auto vs manuel ; pays/devises additionnels |
 | Audit | Durée de rétention des journaux par juridiction ; liste des actions à double validation ; plateforme de stockage |
 | Observability | Plateforme d'observabilité retenue ; seuils d'alerte ; objectifs RTO/RPO |
+| Accounts | Intégration réelle avec les fournisseurs — voir ADR-020, **bloquant tant que le Provider Gateway (Prompt 07) n'existe pas** ; capabilities par fournisseur actuellement statiques, à rendre dynamiques une fois le registre d'adapters en place |
 | Technique (ce dépôt) | Framework de tests (Vitest/Jest) |
 
 Chaque nouveau `TODO_DECISION` rencontré pendant l'implémentation doit être ajouté à ce tableau plutôt que deviné.
