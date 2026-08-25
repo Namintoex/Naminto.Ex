@@ -180,6 +180,30 @@ Format ADR (Architecture Decision Record) léger. Chaque décision liste son con
 - **Statut** : Adopté.
 - **Trouvé et corrigé pendant la vérification** : la première implémentation (contrainte unique simple) aurait renvoyé à tort « déjà lié » lors d'une tentative de reconnexion légitime — repéré en testant réellement le scénario contre la base, pas seulement en relisant le code.
 
+## ADR-022 — Provider Gateway : un adapter générique paramétré plutôt que 5 classes dupliquées
+
+- **Date** : 2026-08-25
+- **Contexte** : le Prompt 07 demande explicitement 5 adapters nommés (`OrangeSandbox`, `MTNSandbox`, `MoovSandbox`, `WaveSandbox`, `CardSandbox`), tous implémentant la même interface `ProviderAdapter`. Dupliquer la logique de simulation (soldes, idempotence, statuts) dans 5 fichiers quasi identiques violerait la règle « ne duplique aucun composant/système ».
+- **Décision** : une fabrique unique `createSandboxAdapter(config)` (`src/domains/providers/sandbox/create-sandbox-adapter.ts`) porte toute la logique de simulation ; les 5 fichiers nommés (`orange.ts`, `mtn.ts`, `moov.ts`, `wave.ts`, `card.ts`) ne font qu'appeler cette fabrique avec leur configuration propre (capacités, support du refund). Le `Provider Registry` (`src/domains/providers/registry.ts`) les enregistre par un `Map<Provider, ProviderAdapter>`. Ajouter un 6ᵉ fournisseur SANDBOX ne nécessite qu'un nouveau fichier de config + un appel `registerAdapter()` — zéro modification du cœur financier, conformément à l'exigence du Prompt 07.
+- **Statut** : Adopté.
+- **Vérifié empiriquement** (script autonome, hors Next.js) : idempotence (rejeu de la même clé → même transaction, aucun double débit), échec pour solde insuffisant, refus d'annuler une transaction déjà confirmée, refund respectant `supportsRefund` par fournisseur, health check, parsing de webhook.
+
+## ADR-023 — Accounts (Prompt 06) rebranché sur le Provider Gateway
+
+- **Date** : 2026-08-25
+- **Contexte** : le domaine Accounts (Prompt 06) avait été construit avant le Provider Gateway et créait les lignes `linked_accounts` directement, avec des capacités statiques et un message « Solde indisponible ».
+- **Décision** : `linkAccountAction` appelle désormais `getProviderAdapter(provider).linkAccount(...)` (capacités dynamiques, retournées par l'adapter) et la page `/accounts` appelle `adapter.getBalance(...)` pour chaque compte actif. Le solde s'affiche clairement étiqueté « Solde (SANDBOX) » — jamais présenté comme réel, conformément au Master Prompt. `src/domains/accounts/providers.ts` ne conserve que les métadonnées visuelles (libellé, couleur) ; les capacités ne vivent plus que côté Provider Gateway.
+- **Statut** : Adopté. Referme partiellement le TODO_DECISION « capabilities statiques » de l'ADR-020 (deviennent dynamiques ; resteront simulées tant que le mode SANDBOX n'est pas remplacé par REAL).
+- **Testé de bout en bout** : liaison MTN via l'UI → solde SANDBOX 250 000 XOF affiché immédiatement (valeur de départ par défaut de la fabrique sandbox).
+
+## ADR-024 — Webhook générique public, persistance différée
+
+- **Date** : 2026-08-25
+- **Contexte** : le Prompt 07 exige que chaque adapter expose une capacité webhook. Aucun fournisseur réel n'appelle jamais une route SANDBOX, mais le contrat doit exister et être exerçable.
+- **Décision** : route générique `POST /api/webhooks/[provider]` (`src/app/api/webhooks/[provider]/route.ts`), ajoutée aux chemins publics de `src/proxy.ts` (un fournisseur externe n'a jamais de session Naminto.Ex). Elle appelle `adapter.verifyAndParseWebhook()` et journalise l'événement — **aucune persistance en base pour l'instant** : le domaine Transaction (Prompt 08) n'existe pas encore pour rattacher un événement webhook à une opération réelle, et la vérification de signature réelle, l'idempotence et le rejeu contrôlé sont le périmètre explicite du Prompt 25 (Webhooks).
+- **Statut** : Adopté.
+- **Vérifié empiriquement** : appel réel à la route (200, événement journalisé côté serveur) et rejet d'un fournisseur inconnu (404).
+
 ## TODO_DECISION en attente (issues des spécifications de domaine)
 
 Ces points sont explicitement non définis dans les documents source. Ils ne doivent pas être devinés ; ils doivent être tranchés par l'utilisateur au moment où le prompt correspondant les rend bloquants.
@@ -192,7 +216,7 @@ Ces points sont explicitement non définis dans les documents source. Ils ne doi
 | Payments | Barème complet des frais au-delà de 3,5 %/1000 FCFA ; durée d'expiration des demandes d'argent/QR ; politique de reversal auto vs manuel ; pays/devises additionnels |
 | Audit | Durée de rétention des journaux par juridiction ; liste des actions à double validation ; plateforme de stockage |
 | Observability | Plateforme d'observabilité retenue ; seuils d'alerte ; objectifs RTO/RPO |
-| Accounts | Intégration réelle avec les fournisseurs — voir ADR-020, **bloquant tant que le Provider Gateway (Prompt 07) n'existe pas** ; capabilities par fournisseur actuellement statiques, à rendre dynamiques une fois le registre d'adapters en place |
+| Accounts / Providers | Adapters REAL pour Orange/MTN/Moov/Wave/cartes — identifiants API, contrats, endpoints à obtenir auprès de chaque fournisseur (bloquant pour toute mise en production) ; vérification de signature webhook réelle et persistance (Prompt 25) ; détection automatique `connection_expired`/`provider_unavailable` (Availability Engine, Prompt 47) |
 | Technique (ce dépôt) | Framework de tests (Vitest/Jest) |
 
 Chaque nouveau `TODO_DECISION` rencontré pendant l'implémentation doit être ajouté à ce tableau plutôt que deviné.

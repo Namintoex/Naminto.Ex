@@ -239,6 +239,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "accounts.error.linkFailed": "La liaison a échoué. Réessayez.",
     "accounts.error.unlinkFailed": "La déliaison a échoué. Réessayez.",
     "accounts.balance.unavailable": "Solde indisponible — fournisseur non connecté",
+    "accounts.balance.sandboxLabel": "Solde (SANDBOX)",
   },
   en: {
     "designSystem.title": "Naminto.Ex Design System",
@@ -474,5 +475,6 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "accounts.error.linkFailed": "Linking failed. Please try again.",
     "accounts.error.unlinkFailed": "Unlinking failed. Please try again.",
     "accounts.balance.unavailable": "Balance unavailable — provider not connected",
+    "accounts.balance.sandboxLabel": "Balance (SANDBOX)",
   },
 };

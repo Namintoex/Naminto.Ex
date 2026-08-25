@@ -18,7 +18,9 @@ import { UnlinkButton } from "./unlink-button";
 type LinkedAccount = Pick<
   Database["public"]["Tables"]["linked_accounts"]["Row"],
   "id" | "provider" | "external_reference" | "status" | "consent_status" | "linked_at"
->;
+> & {
+  balance: { amount: number; currency: string } | null;
+};
 
 function statusVariant(status: LinkedAccount["status"]) {
   if (status === "active") return "success" as const;
@@ -63,9 +65,20 @@ export function AccountsView({ accounts }: { accounts: LinkedAccount[] }) {
                     <CreditCard className="size-4" aria-hidden />
                     {maskExternalReference(account.external_reference)}
                   </div>
-                  <p className="text-xs text-text-secondary">
-                    {t("accounts.balance.unavailable")}
-                  </p>
+                  {account.balance ? (
+                    <p className="text-sm">
+                      <span className="text-text-secondary">
+                        {t("accounts.balance.sandboxLabel")}:{" "}
+                      </span>
+                      <span className="font-semibold text-text-primary">
+                        {account.balance.amount.toLocaleString(locale)} {account.balance.currency}
+                      </span>
+                    </p>
+                  ) : (
+                    <p className="text-xs text-text-secondary">
+                      {t("accounts.balance.unavailable")}
+                    </p>
+                  )}
                   <p className="text-xs text-text-secondary">
                     {t("accounts.linkedSince")}{" "}
                     {new Date(account.linked_at).toLocaleDateString(locale)}

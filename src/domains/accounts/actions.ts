@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { logSecurityEvent } from "@/domains/identity/security-events";
-import { getProviderConfig } from "./providers";
+import { getProviderAdapter } from "@/domains/providers/registry";
 import type { Provider } from "@/lib/supabase/database.types";
 
 export type ActionResult = { error: string } | { success: true };
@@ -36,7 +36,12 @@ export async function linkAccountAction(
     return { error: "session.error.expired" };
   }
 
-  const { capabilities } = getProviderConfig(provider);
+  // Passe par le Provider Gateway plutôt que d'écrire directement des
+  // capabilities statiques — le cœur applicatif ne connaît que
+  // l'interface ProviderAdapter (Prompt 07), jamais un fournisseur concret.
+  const adapter = getProviderAdapter(provider);
+  const linkResult = await adapter.linkAccount({ externalReference });
+  const { capabilities } = linkResult;
 
   // Un compte précédemment délié (status = unlinked) avec la même
   // référence est reconnecté plutôt que dupliqué — "reconnexion" fait
@@ -57,7 +62,7 @@ export async function linkAccountAction(
     const { error: updateError } = await supabase
       .from("linked_accounts")
       .update({
-        status: "active",
+        status: linkResult.status,
         consent_status: "granted",
         capabilities,
         unlinked_at: null,
@@ -86,7 +91,7 @@ export async function linkAccountAction(
       provider,
       external_reference: externalReference,
       capabilities,
-      status: "active",
+      status: linkResult.status,
       consent_status: "granted",
     })
     .select("id")

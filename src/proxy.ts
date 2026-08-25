@@ -2,7 +2,16 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/supabase/env";
 
-const PUBLIC_PATHS = ["/login", "/register", "/reset-password", "/auth", "/design-system"];
+const PUBLIC_PATHS = [
+  "/login",
+  "/register",
+  "/reset-password",
+  "/auth",
+  "/design-system",
+  // Les fournisseurs externes n'ont jamais de session Naminto.Ex — leur
+  // authenticité est vérifiée par signature (voir ProviderAdapter.verifyAndParseWebhook).
+  "/api/webhooks",
+];
 
 function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.some(

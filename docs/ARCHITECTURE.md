@@ -192,8 +192,19 @@ Domaine implémenté dans `src/domains/accounts/`, page `/accounts` (`src/app/(u
 - **Audit** : `account_linked`, `account_reconnected`, `account_unlinked` journalisés dans `security_events` (même mécanisme que les domaines Identity et User).
 - **Non couvert à ce stade** : toute connexion réelle à un fournisseur (bloquant jusqu'au Prompt 07), synchronisation de solde, détection automatique d'expiration de connexion (`connection_expired`, `provider_unavailable` — nécessitent l'Availability Engine du Prompt 47).
 
-## 18. Prochaines étapes
+## 18. Provider Gateway (Prompt 07)
+
+`src/domains/providers/` — le cœur financier de Naminto.Ex ne dépend que de l'interface `ProviderAdapter`, jamais d'un fournisseur concret.
+
+- **Interface** (`types.ts`) : `linkAccount`, `getBalance`, `transfer`, `receive`, `getTransactionStatus`, `cancelTransaction`, `refund`, `verifyAndParseWebhook`, `healthCheck`. Chaque adapter expose un `mode` (`REAL | SANDBOX | MOCK | UNAVAILABLE`) — jamais `REAL` tant qu'aucune API fournisseur n'est réellement connectée.
+- **Adapters SANDBOX** (`sandbox/`) : une fabrique générique `createSandboxAdapter()` porte la logique de simulation (soldes en mémoire, idempotence par clé, échec si solde insuffisant) ; `orange.ts`, `mtn.ts`, `moov.ts`, `wave.ts`, `card.ts` ne fournissent que leur configuration (voir `docs/DECISIONS.md` ADR-022 pour la justification — évite de dupliquer la logique 5 fois).
+- **Provider Registry** (`registry.ts`) : `getProviderAdapter(provider)` résout l'adapter enregistré. Ajouter un fournisseur = un fichier de config + un `registerAdapter()`, jamais de modification du cœur.
+- **Webhook générique** : `POST /api/webhooks/[provider]` (route publique, voir `docs/DECISIONS.md` ADR-024) — démontre le contrat, sans persistance tant que le domaine Transaction (Prompt 08) et les Webhooks (Prompt 25) ne sont pas construits.
+- **Accounts rebranché** (voir ADR-023) : la liaison de compte (Prompt 06) passe désormais par `adapter.linkAccount()`, et `/accounts` affiche un solde SANDBOX réel (simulé) au lieu d'un message d'indisponibilité — toujours clairement étiqueté SANDBOX.
+- **Non couvert à ce stade** : tout adapter `REAL` (nécessite les identifiants et contrats de chaque fournisseur — hors périmètre technique, décision produit/business), vérification de signature webhook réelle et persistance (Prompt 25), utilisation de `transfer`/`receive`/`cancelTransaction`/`refund` par un flux utilisateur (attend le domaine Transaction et le Payment Orchestrator, Prompts 08-09).
+
+## 19. Prochaines étapes
 
 Conformément au protocole, les prompts sont exécutés un par un avec validation entre chaque étape :
 
-- **Prompt 07** — Provider Gateway (abstraction fournisseurs, adapters SANDBOX).
+- **Prompt 08** — Domain Transaction (modèle central de transaction, State Machine).
