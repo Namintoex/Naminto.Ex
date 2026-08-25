@@ -10,6 +10,7 @@ export function Header({
   lightLabel,
   darkLabel,
   variant,
+  userDisplayName,
 }: {
   homeHref: string;
   spaceLabel: string;
@@ -17,6 +18,7 @@ export function Header({
   lightLabel: string;
   darkLabel: string;
   variant: "user" | "admin";
+  userDisplayName?: string | null;
 }) {
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-border-default bg-surface-raised px-3 sm:gap-3 sm:px-6">
@@ -32,7 +34,7 @@ export function Header({
         <NotificationsMenu />
         <LocaleToggle />
         <ThemeToggle lightLabel={lightLabel} darkLabel={darkLabel} />
-        <ProfileMenu variant={variant} />
+        <ProfileMenu variant={variant} displayName={userDisplayName} />
       </div>
     </header>
   );

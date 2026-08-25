@@ -12,7 +12,8 @@ Le dépôt était vierge de code au moment de l'audit : uniquement des documents
 |---|---|---|
 | Frontend | Next.js 16 (App Router) + TypeScript | Décidé (utilisateur, 2026-08-25) |
 | Gestionnaire de paquets | npm | Décidé |
-| Backend / données | Supabase (Postgres, Auth, Storage) | Décidé — projet déjà créé par l'utilisateur, identifiants à fournir avant le Prompt 04 (Identity) |
+| Backend / données | Supabase (Postgres, Auth, Storage) | Décidé et connecté (Prompt 04) |
+| Authentification | Supabase Auth (email + mot de passe) + tables custom (PIN, appareils, audit) | Décidé (Prompt 04, ADR-013) |
 | Style / Design System | Tailwind CSS v4 (tokens CSS `@theme`) + class-variance-authority + Radix UI (primitives accessibles) + lucide-react (icônes) | Décidé (Prompt 02) |
 | Thème clair/sombre | next-themes | Décidé (Prompt 02) |
 | i18n (Design System) | Dictionnaire léger FR/EN (contexte React) — routing i18n applicatif différé au Prompt 03 | Décidé pour le Design System, TODO_DECISION pour l'app |
@@ -153,8 +154,24 @@ Fondation de navigation dans `src/shell/` :
 
 Toutes les routes principales existent avec un état « Bientôt disponible », y compris le tableau de bord (`/` et `/admin`) — aucune donnée financière n'est affichée, conformément au Prompt 03.
 
-## 15. Prochaines étapes
+## 15. Identity (Prompt 04)
+
+Domaine implémenté dans `src/domains/identity/` (Server Actions et requêtes) + `src/lib/supabase/` (clients) + `supabase/migrations/0001_identity.sql` (schéma).
+
+- **Authentification** : Supabase Auth (email + mot de passe). Voir `docs/DECISIONS.md` ADR-013/ADR-014 pour le choix et le report du téléphone/SMS.
+- **Schéma de données** :
+  - `identity_profiles` — extension du profil (naminto_id, nom légal, statut, langue préférée), créée automatiquement à l'inscription par le trigger `handle_new_user` (lit `raw_user_meta_data`).
+  - `pin_credentials` — PIN Naminto.Ex haché (bcrypt), verrouillage après 5 échecs / 15 min. **Aucune policy RLS de lecture** : le hash n'est jamais lu côté client, même par son titulaire.
+  - `devices` — appareils identifiés par un cookie httpOnly opaque (`nx_device_id`), pas de fingerprinting technique.
+  - `security_events` — historique append-only, écrit uniquement via le client `service_role`, lecture seule pour le titulaire.
+- **Clients Supabase** (`src/lib/supabase/`) : `client.ts` (navigateur), `server.ts` (Server Components/Actions, RLS), `admin.ts` (`service_role`, protégé par le paquet `server-only` — ne compile pas si importé côté client).
+- **Parcours construits** : inscription, confirmation par e-mail (`/auth/confirm`), connexion, déconnexion, mot de passe oublié + réinitialisation, création/changement du PIN (redirection automatique si non défini), consultation et révocation des appareils, historique de sécurité.
+- **Protection des routes** : `src/proxy.ts` (voir ADR-016) exige une session valide pour tout ce qui n'est pas `/login`, `/register`, `/reset-password`, `/auth/*`, `/design-system`. **`/admin` n'a pas encore de vérification de rôle** — RBAC prévu au Prompt 23.
+- **Protections de sécurité** : verrouillage du PIN après 5 échecs, journal de sécurité (`security_events`) pour connexion réussie/échouée, nouvel appareil, changement de mot de passe/PIN, révocation d'appareil, déconnexion. Le rate limiting sur mot de passe s'appuie sur les protections natives de Supabase Auth (aucune couche applicative additionnelle).
+- **Non couvert à ce stade** (voir `docs/DECISIONS.md`, TODO_DECISION) : vérification téléphone/SMS, biométrie/WebAuthn, RBAC Back Office, step-up MFA explicite sur nouvel appareil (actuellement journalisé mais non bloquant).
+
+## 16. Prochaines étapes
 
 Conformément au protocole, les prompts sont exécutés un par un avec validation entre chaque étape :
 
-- **Prompt 04** — Identity (nécessite les identifiants Supabase).
+- **Prompt 05** — User Profile + KYC Foundation.

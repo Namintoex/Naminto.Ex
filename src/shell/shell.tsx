@@ -10,10 +10,12 @@ import { adminNavItems, userNavItems } from "./nav-config";
 export function Shell({
   variant,
   homeHref,
+  userDisplayName,
   children,
 }: {
   variant: "user" | "admin";
   homeHref: string;
+  userDisplayName?: string | null;
   children: ReactNode;
 }) {
   const { t } = useLocale();
@@ -29,10 +31,11 @@ export function Shell({
         lightLabel={t("theme.light")}
         darkLabel={t("theme.dark")}
         variant={variant}
+        userDisplayName={userDisplayName}
       />
       <div className="flex flex-1">
         <Sidebar items={navItems} />
-        <main className="flex-1 pb-20 lg:pb-0">{children}</main>
+        <main className="min-w-0 flex-1 pb-20 lg:pb-0">{children}</main>
       </div>
       <MobileNav items={navItems} title={spaceLabel} />
     </div>

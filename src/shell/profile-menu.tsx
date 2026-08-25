@@ -2,6 +2,7 @@
 
 import { LogOut, Shield, Settings as SettingsIcon, ArrowLeftRight, UserCircle } from "lucide-react";
 import Link from "next/link";
+import { useTransition } from "react";
 import {
   Button,
   DropdownMenu,
@@ -11,9 +12,18 @@ import {
   DropdownMenuTrigger,
 } from "@/design-system";
 import { useLocale } from "@/design-system/i18n/locale-provider";
+import { logoutAction } from "@/domains/identity/actions";
 
-export function ProfileMenu({ variant }: { variant: "user" | "admin" }) {
+export function ProfileMenu({
+  variant,
+  displayName,
+}: {
+  variant: "user" | "admin";
+  displayName?: string | null;
+}) {
   const { t } = useLocale();
+  const [pending, startTransition] = useTransition();
+  const initials = (displayName ?? "NX").slice(0, 2).toUpperCase();
 
   return (
     <DropdownMenu>
@@ -25,7 +35,7 @@ export function ProfileMenu({ variant }: { variant: "user" | "admin" }) {
           aria-label={t("profile.viewProfile")}
         >
           <span className="flex size-7 items-center justify-center rounded-full bg-brand text-xs font-semibold text-brand-foreground">
-            NX
+            {initials}
           </span>
         </Button>
       </DropdownMenuTrigger>
@@ -34,7 +44,7 @@ export function ProfileMenu({ variant }: { variant: "user" | "admin" }) {
           <UserCircle className="size-8 text-text-secondary" aria-hidden />
           <div className="flex flex-col">
             <span className="text-sm font-medium text-text-primary">
-              {t("profile.guest")}
+              {displayName ?? t("profile.guest")}
             </span>
           </div>
         </div>
@@ -63,7 +73,16 @@ export function ProfileMenu({ variant }: { variant: "user" | "admin" }) {
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem className="text-danger" disabled>
+        <DropdownMenuItem
+          className="text-danger"
+          disabled={pending}
+          onSelect={(event) => {
+            event.preventDefault();
+            startTransition(() => {
+              logoutAction();
+            });
+          }}
+        >
           <LogOut className="size-4" aria-hidden />
           {t("profile.signOut")}
         </DropdownMenuItem>
