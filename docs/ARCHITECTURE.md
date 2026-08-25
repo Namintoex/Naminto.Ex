@@ -135,9 +135,26 @@ Fondation UI centralisée dans `src/design-system/`, consommée via l'alias `@/d
 - **i18n (Design System uniquement)** : `src/design-system/i18n/` (LocaleProvider + dictionnaires FR/EN) — ne préjuge pas de la solution i18n applicative complète (routing), différée au Prompt 03.
 - **Démonstration** : page `/design-system` (`src/app/design-system/page.tsx`) — rend tous les composants dans les deux thèmes et les deux langues. Aucun composant financier spécifique n'y figure, conformément au Prompt 02.
 
-## 14. Prochaines étapes
+## 14. Application Shell (Prompt 03)
+
+Fondation de navigation dans `src/shell/` :
+
+- **`shell.tsx`** — composant unique paramétré par `variant: "user" | "admin"`, compose Header + Sidebar (desktop) + navigation mobile. Un seul composant pour les deux espaces (pas de duplication), mais séparation **structurelle réelle** au niveau des routes (voir ci-dessous).
+- **`nav-config.ts`** — `userNavItems` (10 routes) et `adminNavItems` (17 routes, calquées sur le Back Office de la section 55 de l'architecture générale), chacune avec icône Lucide, clé de traduction et flag `primary` (affiché dans la barre d'onglets mobile).
+- **`header.tsx`** — marque, badge d'espace (Application / Back Office), notifications, sélecteur de langue, sélecteur de thème, menu profil. Responsive : les libellés langue/thème se réduisent aux icônes sous `sm`.
+- **`sidebar.tsx`** — navigation persistante desktop (`lg:flex`, masquée en dessous).
+- **`mobile-nav.tsx`** — barre d'onglets basse (4 items primaires + « Plus ») en dessous de `lg`, le bouton « Plus » ouvre un `Sheet` listant l'intégralité des liens.
+- **`notifications-menu.tsx`**, **`profile-menu.tsx`** — menus déroulants (Radix DropdownMenu) ; aucune logique financière, aucune authentification réelle (le bouton « Se déconnecter » est désactivé en attendant le Prompt 04).
+- **`coming-soon-page.tsx`** — page générique « Bientôt disponible » utilisée par toutes les routes de domaine non encore implémentées.
+
+**Séparation USER APP / BACK OFFICE** : arborescence de routes distincte —
+`src/app/(user)/` (groupe de routes, racine `/`) pour l'application utilisateur,
+`src/app/admin/` (segment réel, préfixe `/admin`) pour le Back Office — chacun avec son propre `layout.tsx` montant `<Shell variant="…">`. Voir `docs/DECISIONS.md` ADR-011 pour le détail et les alternatives écartées.
+
+Toutes les routes principales existent avec un état « Bientôt disponible », y compris le tableau de bord (`/` et `/admin`) — aucune donnée financière n'est affichée, conformément au Prompt 03.
+
+## 15. Prochaines étapes
 
 Conformément au protocole, les prompts sont exécutés un par un avec validation entre chaque étape :
 
-- **Prompt 03** — Application Shell (navigation, USER APP / BACK OFFICE séparés structurellement, décision de routing i18n).
 - **Prompt 04** — Identity (nécessite les identifiants Supabase).

@@ -10,6 +10,7 @@ export function LocaleToggle() {
     <Button
       variant="secondary"
       size="sm"
+      className="px-2 sm:px-4"
       onClick={() => setLocale(locale === "fr" ? "en" : "fr")}
       aria-label="Changer de langue"
     >

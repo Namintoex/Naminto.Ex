@@ -75,6 +75,25 @@ Format ADR (Architecture Decision Record) léger. Chaque décision liste son con
 - **Décision** : pour le Prompt 02, un `LocaleProvider` léger (contexte React + dictionnaires `fr`/`en` dans `src/design-system/i18n/`) suffit à démontrer et tester chaque composant dans les deux langues. Le choix définitif de la solution de routing i18n pour l'ensemble de l'application est différé au Prompt 03.
 - **Statut** : Adopté pour le Design System — **TODO_DECISION** pour l'i18n au niveau applicatif (voir tableau ci-dessous).
 
+## ADR-011 — Application Shell : séparation par arborescence de routes, i18n applicatif sans préfixe d'URL
+
+- **Date** : 2026-08-25
+- **Contexte** : le Prompt 03 exige que USER APP et BACK OFFICE soient « structurellement séparés », et fournit une liste de routes principales à créer.
+- **Décision** :
+  - Séparation via l'arborescence Next.js : l'espace utilisateur vit dans le groupe de routes `src/app/(user)/` (racine `/`, ex. `/send`, `/history`…) ; le Back Office vit sous le segment réel `src/app/admin/` (préfixe `/admin/...`), chacun avec son propre `layout.tsx`.
+  - Un seul composant `Shell` (`src/shell/shell.tsx`), paramétré par `variant: "user" | "admin"`, compose Header + Sidebar + navigation mobile pour les deux espaces — évite de dupliquer un composant pour deux usages quasi identiques (cf. règle Prompt 02 « ne duplique aucun composant »).
+  - i18n : on conserve le `LocaleProvider` léger du Prompt 02, maintenant utilisé pour toute l'application (persistance via `localStorage`, lu de façon hydration-safe avec `useSyncExternalStore`). Pas de préfixe de locale dans l'URL (`/fr/...`, `/en/...`) : aucune spécification n'exige de SEO multilingue ni d'URLs localisées à ce stade, et une solution de routing complète (ex. `next-intl`) resterait à réévaluer si ce besoin apparaît.
+  - Toutes les routes principales (10 côté utilisateur, 17 côté Back Office) sont créées avec un état « Bientôt disponible » via un composant `ComingSoonPage` partagé, conformément au Prompt 03. Le tableau de bord utilisateur (`/`) est lui aussi à l'état « Bientôt disponible » — aucune donnée financière n'est simulée, conformément à « Ne mets aucune logique financière dans le shell ».
+- **Statut** : Adopté. Referme le TODO_DECISION i18n applicatif ouvert par l'ADR-010.
+- **Conséquence** : passer les tableaux de navigation (icônes Lucide, composants fonctions) d'un Server Component vers `Shell` (Client Component) échoue à la sérialisation RSC — `Shell` importe donc directement `userNavItems`/`adminNavItems` en interne plutôt que de les recevoir en props depuis les layouts.
+
+## ADR-012 — Sheet (panneau latéral) ajouté au Design System pour la navigation mobile
+
+- **Date** : 2026-08-25
+- **Contexte** : le Prompt 03 exige une navigation mobile dédiée. La barre d'onglets basse ne peut afficher que 4 éléments primaires ; le reste du menu doit être accessible via un panneau.
+- **Décision** : ajout de `Sheet`/`SheetContent` (`src/design-system/components/sheet.tsx`) au Design System, construit sur `@radix-ui/react-dialog` (même primitive que `Modal`, avec positionnement latéral). Réutilisé par `MobileNav` pour afficher la liste complète des liens.
+- **Statut** : Adopté.
+
 ## TODO_DECISION en attente (issues des spécifications de domaine)
 
 Ces points sont explicitement non définis dans les documents source. Ils ne doivent pas être devinés ; ils doivent être tranchés par l'utilisateur au moment où le prompt correspondant les rend bloquants.
@@ -86,6 +105,6 @@ Ces points sont explicitement non définis dans les documents source. Ils ne doi
 | Payments | Barème complet des frais au-delà de 3,5 %/1000 FCFA ; durée d'expiration des demandes d'argent/QR ; politique de reversal auto vs manuel ; pays/devises additionnels |
 | Audit | Durée de rétention des journaux par juridiction ; liste des actions à double validation ; plateforme de stockage |
 | Observability | Plateforme d'observabilité retenue ; seuils d'alerte ; objectifs RTO/RPO |
-| Technique (ce dépôt) | Framework de tests (Vitest/Jest) ; solution de routing i18n applicative (voir ADR-010) — à trancher au Prompt 03 |
+| Technique (ce dépôt) | Framework de tests (Vitest/Jest) |
 
 Chaque nouveau `TODO_DECISION` rencontré pendant l'implémentation doit être ajouté à ce tableau plutôt que deviné.

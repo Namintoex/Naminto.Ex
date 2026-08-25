@@ -8,6 +8,7 @@ export * from "./components/error-state";
 export * from "./components/form-field";
 export * from "./components/locale-toggle";
 export * from "./components/modal";
+export * from "./components/sheet";
 export * from "./components/skeleton";
 export * from "./components/spinner";
 export * from "./components/table";
