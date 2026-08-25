@@ -97,7 +97,7 @@ export async function runPaymentOrchestrator(request: PaymentRequest): Promise<O
     throw new OrchestratorError("SYSTEM_ERROR", `Routing: ${(err as Error).message}`);
   }
 
-  const { fee } = await calculateFeeStep(request, route);
+  const { fee, feePayer } = await calculateFeeStep(request, route);
 
   // 2. Création idempotente de la transaction.
   let transaction: Transaction;
@@ -113,6 +113,7 @@ export async function runPaymentOrchestrator(request: PaymentRequest): Promise<O
       amount: request.amount,
       currency: request.currency,
       fee,
+      feePayer,
       idempotencyKey: request.idempotencyKey,
     })) as Transaction;
   } catch (err) {

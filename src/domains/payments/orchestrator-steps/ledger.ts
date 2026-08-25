@@ -1,12 +1,15 @@
 import "server-only";
+import { recordSettlement } from "@/domains/payments/ledger";
+import { OrchestratorError } from "../orchestrator-errors";
 
 /**
- * Étape 9 — Ledger. STUB : le Financial Ledger réel (écritures
- * append-only, comptes, débit/crédit — Prompt 12) n'existe pas encore.
- * Cette étape reste présente dans le pipeline, avec la signature qu'elle
- * aura une fois réelle, pour que son branchement futur ne modifie pas le
- * Payment Orchestrator.
+ * Étape 9 — Ledger (Prompt 12). Délègue entièrement au domaine Ledger :
+ * aucune logique comptable ici. Idempotent — voir recordSettlement.
  */
 export async function writeLedgerEntries(transactionId: string): Promise<void> {
-  console.info("[ledger:stub] écriture différée au Prompt 12", { transactionId });
+  try {
+    await recordSettlement(transactionId);
+  } catch (err) {
+    throw new OrchestratorError("SYSTEM_ERROR", `Ledger: ${(err as Error).message}`);
+  }
 }

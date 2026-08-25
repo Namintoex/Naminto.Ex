@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { assertTransition, type TransactionStatus } from "./transaction-status";
 import type {
   DestinationType,
+  FeePayer,
   Provider,
   SourceType,
 } from "@/lib/supabase/database.types";
@@ -28,6 +29,7 @@ export interface CreateTransactionParams {
   amount: number;
   currency?: string;
   fee?: number;
+  feePayer?: FeePayer;
   idempotencyKey: string;
 }
 
@@ -84,6 +86,7 @@ export async function createTransaction(params: CreateTransactionParams) {
       currency: params.currency ?? "XOF",
       fee,
       total: params.amount + fee,
+      fee_payer: params.feePayer ?? "sender",
       status: "created",
     })
     .select("*")

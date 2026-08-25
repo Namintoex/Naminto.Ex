@@ -310,6 +310,29 @@ Format ADR (Architecture Decision Record) léger. Chaque décision liste son con
 - **Statut** : Adopté.
 - **Trouvé et corrigé pendant la vérification** : le test « portefeuille → portefeuille » de `orchestrator.test.ts` échouait par intermittence avec `LIMIT_ERROR`, provoqué par la règle `frequency_count` temporaire du test `check-limits.test.ts` exécuté en parallèle sur un utilisateur totalement différent — pas un bug du Limit Engine lui-même, mais une leçon sur l'isolation des tests d'intégration face à une configuration globale partagée.
 
+## ADR-038 — Ledger : immuabilité réelle de `ledger_entries`, y compris pour `service_role`
+
+- **Date** : 2026-08-25
+- **Contexte** : le Prompt 12 exige un Ledger « append-only » comme source comptable de vérité (`docs/ARCHITECTURE.md`, section 11). En production, l'application n'accède jamais à la base autrement que via `service_role` — si ce rôle pouvait modifier ou supprimer une écriture, la garantie d'immuabilité serait purement conventionnelle, pas réelle.
+- **Décision** : `supabase/migrations/0008_ledger.sql` ajoute un trigger (`forbid_ledger_entries_mutation`) qui bloque UPDATE et DELETE sur `ledger_entries` pour **tout rôle**, y compris `service_role`. Toute correction (erreur, litige) doit être une nouvelle écriture de type `reversal`/`refund`, jamais une réécriture.
+- **Statut** : Adopté.
+- **Conséquence assumée sur les tests d'intégration** : une transaction créée pendant un test qui atteint réellement le règlement (`recordSettlement`) garde définitivement ses écritures et son propre enregistrement `transactions` en base (la contrainte de clé étrangère empêche de supprimer une transaction référencée par des écritures qu'on ne peut plus supprimer) — exactement comme en production. `orchestrator.test.ts` et `ledger/record-entries.test.ts` ne suppriment donc en fin de test que les transactions qui n'ont **jamais** été réglées ; les autres restent en base, au même titre que le compte de démonstration `demo.naminto.ex@example.test` laissé volontairement en place.
+
+## ADR-039 — Ledger : mapping compte source/destination dérivé de `source_type`/`destination_type`
+
+- **Date** : 2026-08-25
+- **Contexte** : aucun document source ne précise explicitement quel compte interne du grand livre représente chaque combinaison possible de `source_type`/`destination_type`/`provider` d'une transaction — seul le principe général (comptabilité en partie double) est documenté.
+- **Décision** (`src/domains/payments/ledger/record-entries.ts`) : `naminto_wallet` → compte `user_wallet` (scopé par `sender_user_id`/`recipient_user_id`) ; `linked_account` → compte `provider_suspense` (scopé par `provider`, représente l'argent en transit sur le rail du fournisseur) ; `destination_type = external` (hors Naminto.Ex et hors fournisseur modélisé) → compte générique `external_suspense`. Les frais, quand ils existent, créditent toujours un compte `fee_revenue` global par devise.
+- **Statut** : Adopté à titre de choix d'implémentation raisonnable — **TODO_DECISION** si un plan comptable plus précis (un compte de transit par fournisseur *et* par pays, par exemple) est requis plus tard.
+
+## ADR-040 — Ledger : garde-fous applicatifs avant les contraintes base (montant, devise, équilibre)
+
+- **Date** : 2026-08-25
+- **Contexte** : `ledger_entries` porte déjà une contrainte `amount > 0` côté base, mais rien ne garantissait qu'un lot d'écritures reste équilibré (Σdébits = Σcrédits) ni homogène en devise avant l'insertion.
+- **Décision** : `writeBalancedEntries` (fonction interne unique par laquelle transitent `recordSettlement`/`recordReversal`/`recordRefund`) valide le lot avant tout appel réseau — montant strictement positif (`LedgerInvalidAmountError`), devise unique par lot (`LedgerCurrencyMismatchError`), équilibre débit/crédit (`LedgerImbalanceError`) — même logique de défense en profondeur que la State Machine de transaction (ADR-026).
+- **Statut** : Adopté.
+- **Vérifié empiriquement** (tests d'intégration `ledger/record-entries.test.ts`) : frais payés par l'expéditeur/le destinataire (écritures équilibrées dans les deux cas) ; double appel à `recordSettlement`/`recordRefund` sans deuxième lot (idempotence) ; montant ≤ 0, devises mêlées et lot déséquilibré tous rejetés avant écriture ; transaction inexistante rejetée pour les trois fonctions ; `recordReversal` sans règlement préalable rejeté (`LedgerMissingSettlementError`) ; écritures miroir d'un reversal strictement inverses de celles du règlement, compte par compte.
+
 ## TODO_DECISION en attente (issues des spécifications de domaine)
 
 Ces points sont explicitement non définis dans les documents source. Ils ne doivent pas être devinés ; ils doivent être tranchés par l'utilisateur au moment où le prompt correspondant les rend bloquants.
@@ -320,6 +343,7 @@ Ces points sont explicitement non définis dans les documents source. Ils ne doi
 | Sécurité (Back Office) | RBAC sur `/admin` — voir ADR-016, **bloquant avant toute mise en production** |
 | User | Processus de changement de numéro de téléphone ; politique de changement du nom légal post-KYC (les deux restent en lecture seule dans `/settings` pour l'instant) ; intégration d'un fournisseur KYC externe (statut actuellement toujours `unverified`, jamais mis à jour automatiquement) |
 | Payments | Barème dégressif réel au-delà du taux de repli 3,5 %/1000 FCFA (la table `fee_rules` le permet, mais aucune règle par palier n'est encore saisie) ; **valeurs réelles des limites** (`limit_rules` est vide — table prête mais aucun plafond journalier/mensuel/par transaction/de fréquence n'est configuré, **bloquant avant toute mise en production réelle**) ; notion de `user_tier` (colonne prête, aucun palier utilisateur n'existe encore côté User) ; durée d'expiration des demandes d'argent/QR ; politique de reversal auto vs manuel ; pays/devises additionnels ; workflow de résolution d'un statut `disputed` (ADR-027) |
+| Ledger | Plan comptable des comptes de transit (un `provider_suspense` par fournisseur uniquement, pas encore par pays — ADR-039) ; déclencheur réel de `recordReversal`/`recordRefund` (aucun écran de litige/remboursement n'existe encore) ; consultation du solde de portefeuille par l'utilisateur (les écritures existent, aucune UI ne les agrège encore) |
 | Audit | Durée de rétention des journaux par juridiction ; liste des actions à double validation ; plateforme de stockage |
 | Observability | Plateforme d'observabilité retenue ; seuils d'alerte ; objectifs RTO/RPO |
 | Accounts / Providers | Adapters REAL pour Orange/MTN/Moov/Wave/cartes — identifiants API, contrats, endpoints à obtenir auprès de chaque fournisseur (bloquant pour toute mise en production) ; vérification de signature webhook réelle et persistance (Prompt 25) ; détection automatique `connection_expired`/`provider_unavailable` (Availability Engine, Prompt 47) |

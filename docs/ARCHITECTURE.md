@@ -247,8 +247,21 @@ Domaine implémenté dans `src/domains/accounts/`, page `/accounts` (`src/app/(u
 - **Accès** : aucune policy RLS cliente sur `limit_rules` — `service_role` uniquement, faute d'UI Back Office (Prompt 22).
 - **Non couvert à ce stade** : **aucune valeur de limite réelle configurée** (bloquant avant mise en production) ; `user_tier` (même limitation que le Fee Engine) ; UI de gestion des règles.
 
-## 23. Prochaines étapes
+## 23. Ledger (Prompt 12)
+
+`src/domains/payments/ledger/` — comptabilité en partie double, append-only, remplaçant le STUB `writeLedgerEntries` posé au Prompt 09. Aucune règle métier de comptabilité côté orchestrateur : `orchestrator-steps/ledger.ts` délègue entièrement au domaine.
+
+- **Schéma** (`supabase/migrations/0008_ledger.sql`) : `fee_payer` ajouté à `transactions` (déterminé par le Fee Engine à la création, Prompt 10 — nécessaire pour dériver qui est débité) ; `ledger_accounts` (comptes internes : `user_wallet`, `provider_suspense`, `fee_revenue`, `external_suspense` — index unique sur owner_type/owner_id/provider/currency) ; `ledger_entries` (transaction_id, account_id, kind `settlement|reversal|refund`, direction `debit|credit`, montant `> 0`, devise, référence).
+- **Immuabilité réelle** : trigger `forbid_ledger_entries_mutation` bloque UPDATE et DELETE sur `ledger_entries`, **y compris pour `service_role`** — toute correction doit être une nouvelle écriture (`reversal`/`refund`), jamais une réécriture. Conséquence assumée : une transaction de test qui atteint le règlement garde définitivement ses écritures en base, même en environnement de test (voir ADR-038).
+- **Comptes** (`accounts.ts`) : `getOrCreateLedgerAccount` résout un compte à partir d'une référence logique (owner_type/owner_id/provider/currency), le crée s'il n'existe pas ; idempotent via l'index unique (relit en cas de course de création concurrente).
+- **Écritures** (`record-entries.ts`) : `writeBalancedEntries` est le seul point d'écriture — rejette un lot déséquilibré (Σdébits ≠ Σcrédits), multi-devise, ou contenant un montant ≤ 0, avant toute insertion (défense en profondeur, la contrainte `amount > 0` existe aussi côté base).
+  - `recordSettlement(transactionId)` dérive les écritures de règlement à partir de la transaction : débit du compte source (`sender_user_id` si `naminto_wallet`, sinon compte de transit du fournisseur), crédit du compte destination (`recipient_user_id`, compte de transit fournisseur, ou compte de transit externe générique selon `destination_type`), crédit du compte `fee_revenue` si des frais existent. Idempotent (rejouer ne crée pas de deuxième lot).
+  - `recordReversal`/`recordRefund(transactionId)` produisent des écritures miroir (débit/crédit inversés) à partir du règlement existant — échouent si aucun règlement n'a été enregistré. Idempotents chacun indépendamment.
+- **Accès** : lecture seule cliente, restreinte au propre portefeuille de l'utilisateur (`owner_type = 'user_wallet' AND owner_id = auth.uid()`) sur les deux tables ; aucune policy d'écriture cliente.
+- **Non couvert à ce stade** : déclenchement de `recordReversal`/`recordRefund` depuis un flux utilisateur ou administratif réel (aucun écran de litige/remboursement n'existe encore — attend un prompt ultérieur) ; solde de portefeuille consultable par l'utilisateur (les écritures existent, aucune UI ne les agrège encore — `/admin/ledger` reste « Bientôt disponible »).
+
+## 24. Prochaines étapes
 
 Conformément au protocole, les prompts sont exécutés un par un avec validation entre chaque étape :
 
-- **Prompt 12** — Ledger (écritures comptables append-only, comptes, débit/crédit — remplaçant le STUB `writeLedgerEntries` posé au Prompt 09).
+- **Prompt 13** — à confirmer avec l'utilisateur avant de commencer.

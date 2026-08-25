@@ -23,6 +23,9 @@ export type DestinationType = "naminto_wallet" | "linked_account" | "external";
 export type FeePayer = "sender" | "recipient";
 export type FeeTransactionType = "send" | "request";
 export type LimitType = "per_transaction_amount" | "daily_amount" | "monthly_amount" | "frequency_count";
+export type LedgerAccountOwnerType = "user_wallet" | "provider_suspense" | "fee_revenue" | "external_suspense";
+export type LedgerEntryKind = "settlement" | "reversal" | "refund";
+export type LedgerEntryDirection = "debit" | "credit";
 
 export interface Database {
   public: {
@@ -198,6 +201,7 @@ export interface Database {
           currency: string;
           fee: number;
           total: number;
+          fee_payer: FeePayer;
           status: TransactionStatus;
           provider_transaction_id: string | null;
           created_at: string;
@@ -218,6 +222,7 @@ export interface Database {
           currency?: string;
           fee?: number;
           total: number;
+          fee_payer?: FeePayer;
           status?: TransactionStatus;
           provider_transaction_id?: string | null;
         };
@@ -342,6 +347,50 @@ export interface Database {
           user_tier: string | null;
           active: boolean;
         }>;
+        Relationships: [];
+      };
+      ledger_accounts: {
+        Row: {
+          id: string;
+          owner_type: LedgerAccountOwnerType;
+          owner_id: string | null;
+          provider: Provider | null;
+          currency: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          owner_type: LedgerAccountOwnerType;
+          owner_id?: string | null;
+          provider?: Provider | null;
+          currency: string;
+        };
+        Update: never;
+        Relationships: [];
+      };
+      ledger_entries: {
+        Row: {
+          id: string;
+          transaction_id: string;
+          account_id: string;
+          kind: LedgerEntryKind;
+          direction: LedgerEntryDirection;
+          amount: number;
+          currency: string;
+          reference: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          transaction_id: string;
+          account_id: string;
+          kind: LedgerEntryKind;
+          direction: LedgerEntryDirection;
+          amount: number;
+          currency: string;
+          reference: string;
+        };
+        Update: never;
         Relationships: [];
       };
     };

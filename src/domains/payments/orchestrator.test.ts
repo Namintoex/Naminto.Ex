@@ -92,7 +92,20 @@ describe("Payment Orchestrator (intégration)", () => {
 
   afterAll(async () => {
     if (createdTransactionIds.length > 0) {
-      await admin.from("transactions").delete().in("id", createdTransactionIds);
+      // ledger_entries est append-only, même pour service_role (voir
+      // 0008_ledger.sql) — une transaction réglée pendant le test garde
+      // définitivement ses écritures, comme en production. On ne peut
+      // donc supprimer ici que les transactions qui n'ont jamais été
+      // réglées (aucune écriture Ledger associée).
+      const { data: settledEntries } = await admin
+        .from("ledger_entries")
+        .select("transaction_id")
+        .in("transaction_id", createdTransactionIds);
+      const settledIds = new Set((settledEntries ?? []).map((e) => e.transaction_id));
+      const deletableIds = createdTransactionIds.filter((id) => !settledIds.has(id));
+      if (deletableIds.length > 0) {
+        await admin.from("transactions").delete().in("id", deletableIds);
+      }
     }
     if (createdLinkedAccountIds.length > 0) {
       await admin.from("linked_accounts").delete().in("id", createdLinkedAccountIds);
