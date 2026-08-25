@@ -1,8 +1,9 @@
+import type { TransactionStatus } from "@/domains/payments/transaction-status";
+
 /**
  * Types manuels reflétant supabase/migrations/0001_identity.sql et
- * 0002_user_profile.sql. À remplacer par `supabase gen types typescript`
- * une fois le CLI Supabase connecté au projet (voir docs/DECISIONS.md,
- * TODO_DECISION).
+ * suivantes. À remplacer par `supabase gen types typescript` une fois le
+ * CLI Supabase connecté au projet (voir docs/DECISIONS.md, TODO_DECISION).
  */
 export type IdentityStatus = "pending_verification" | "active" | "suspended" | "closed";
 export type DeviceStatus = "active" | "untrusted" | "revoked";
@@ -17,6 +18,8 @@ export type LinkedAccountStatus =
   | "unlinked"
   | "provider_unavailable";
 export type ConsentStatus = "granted" | "revoked" | "pending";
+export type SourceType = "naminto_wallet" | "linked_account";
+export type DestinationType = "naminto_wallet" | "linked_account" | "external";
 
 export interface Database {
   public: {
@@ -174,6 +177,70 @@ export interface Database {
           last_synced_at: string | null;
           unlinked_at: string | null;
         }>;
+        Relationships: [];
+      };
+      transactions: {
+        Row: {
+          id: string;
+          reference: string;
+          idempotency_key: string;
+          sender_user_id: string | null;
+          recipient_user_id: string | null;
+          source_type: SourceType;
+          source_reference: string | null;
+          destination_type: DestinationType;
+          destination_reference: string | null;
+          provider: Provider | null;
+          amount: number;
+          currency: string;
+          fee: number;
+          total: number;
+          status: TransactionStatus;
+          provider_transaction_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          reference: string;
+          idempotency_key: string;
+          sender_user_id?: string | null;
+          recipient_user_id?: string | null;
+          source_type: SourceType;
+          source_reference?: string | null;
+          destination_type: DestinationType;
+          destination_reference?: string | null;
+          provider?: Provider | null;
+          amount: number;
+          currency?: string;
+          fee?: number;
+          total: number;
+          status?: TransactionStatus;
+          provider_transaction_id?: string | null;
+        };
+        Update: Partial<{
+          status: TransactionStatus;
+          provider_transaction_id: string | null;
+        }>;
+        Relationships: [];
+      };
+      transaction_status_events: {
+        Row: {
+          id: string;
+          transaction_id: string;
+          from_status: TransactionStatus | null;
+          to_status: TransactionStatus;
+          reason: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          transaction_id: string;
+          from_status?: TransactionStatus | null;
+          to_status: TransactionStatus;
+          reason?: string | null;
+        };
+        Update: never;
         Relationships: [];
       };
     };

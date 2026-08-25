@@ -88,7 +88,7 @@ Ce flux (détaillé dans `PAYMENTS — Spécification Markdown.docx`) est la ré
 - Tests d'intégration sur le Payment Orchestrator (parcours complet, y compris échecs classifiés).
 - Tests de non-régression obligatoires avant de clore toute tâche (Phase F du workflow obligatoire).
 - Scénarios explicitement exigés par le Master Prompt : double clic, refresh, retry, timeout, double webhook, panne fournisseur.
-- Framework de test précis à choisir au Prompt 02 (TODO_DECISION, voir `/docs/DECISIONS.md`).
+- Framework de test : Vitest (`npm run test`), retenu au Prompt 08 — voir `docs/DECISIONS.md` ADR-025. Les tests d'intégration (ex. `src/domains/payments/transactions.test.ts`) tournent contre le vrai projet Supabase de développement et créent/suppriment leurs propres données de test.
 
 ## 8. Sécurité
 
@@ -203,8 +203,18 @@ Domaine implémenté dans `src/domains/accounts/`, page `/accounts` (`src/app/(u
 - **Accounts rebranché** (voir ADR-023) : la liaison de compte (Prompt 06) passe désormais par `adapter.linkAccount()`, et `/accounts` affiche un solde SANDBOX réel (simulé) au lieu d'un message d'indisponibilité — toujours clairement étiqueté SANDBOX.
 - **Non couvert à ce stade** : tout adapter `REAL` (nécessite les identifiants et contrats de chaque fournisseur — hors périmètre technique, décision produit/business), vérification de signature webhook réelle et persistance (Prompt 25), utilisation de `transfer`/`receive`/`cancelTransaction`/`refund` par un flux utilisateur (attend le domaine Transaction et le Payment Orchestrator, Prompts 08-09).
 
-## 19. Prochaines étapes
+## 19. Domain Transaction (Prompt 08)
+
+`src/domains/payments/` — modèle central de transaction et sa State Machine, reprenant exactement la table de transitions documentée (aucune transition inventée).
+
+- **State Machine** (`transaction-status.ts`, pur, sans dépendance) : 14 statuts (`created` → `validating` → `authentication_required` → `authenticated` → `processing` → `provider_confirmed` → `settled`, plus les états terminaux `failed`, `rejected`, `expired`, `cancelled`, `reversed`, `refunded`, `disputed`). `canTransition`/`assertTransition`/`isTerminalStatus` exposés et testés exhaustivement (`transaction-status.test.ts`, 9 tests couvrant chaque paire statut×statut).
+- **Schéma** (`supabase/migrations/0005_transactions.sql`) : `transactions` (sender/recipient, source/destination, provider, amount/currency/fee/total, reference `NEX-XXXXXXXX`, idempotency_key, status) et `transaction_status_events` (historique append-only de chaque transition). **Aucune policy RLS d'écriture** sur les deux tables — lecture seule pour les participants, toute mutation passe par `transactions.ts` (`service_role`).
+- **Défense en profondeur** : un trigger Postgres (`check_transaction_status_transition`) revalide la même State Machine côté base, en miroir du TypeScript — voir `docs/DECISIONS.md` ADR-026.
+- **Service** (`transactions.ts`) : `createTransaction` (idempotente par clé), `transitionTransaction` (applique `assertTransition` avant toute écriture), `getTransactionById`. Aucune Server Action générique « changer le statut » n'est exposée à un formulaire — conforme à l'exigence explicite du Prompt 08.
+- **Non couvert à ce stade** : aucun flux utilisateur ne crée encore de transaction (attend le Payment Orchestrator, Prompt 09, et Send Money, Prompt 13) ; Fee Engine non branché (`fee` vaut 0 par défaut) ; résolution d'un statut `disputed` (ADR-027).
+
+## 20. Prochaines étapes
 
 Conformément au protocole, les prompts sont exécutés un par un avec validation entre chaque étape :
 
-- **Prompt 08** — Domain Transaction (modèle central de transaction, State Machine).
+- **Prompt 09** — Payment Orchestrator (flux Request → Validation → Authentication → Risk → Compliance → Limits → Fee → Routing → Provider Gateway → Transaction → Ledger → Notification → Reconciliation).

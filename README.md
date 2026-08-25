@@ -18,7 +18,16 @@ Next.js 16 (App Router) + TypeScript strict, npm, Supabase (backend/données).
 
 ```bash
 npm install
+cp .env.example .env.local   # renseigner les identifiants Supabase du projet Naminto.Ex
 npm run dev
 ```
 
 Ouvrir [http://localhost:3000](http://localhost:3000).
+
+## Tests
+
+```bash
+npm run test
+```
+
+⚠️ Les tests d'intégration (`*.test.ts` sous `src/domains/`) tournent contre le vrai projet Supabase défini dans `.env.local` — ils créent et suppriment leurs propres données de test, mais nécessitent des identifiants valides.

@@ -204,6 +204,30 @@ Format ADR (Architecture Decision Record) léger. Chaque décision liste son con
 - **Statut** : Adopté.
 - **Vérifié empiriquement** : appel réel à la route (200, événement journalisé côté serveur) et rejet d'un fournisseur inconnu (404).
 
+## ADR-025 — Vitest comme framework de tests
+
+- **Date** : 2026-08-25
+- **Contexte** : le Prompt 08 exige explicitement des « tests de transition » pour la State Machine — ce TODO_DECISION technique ne pouvait plus rester ouvert.
+- **Décision** : Vitest (`vitest.config.mts`, `npm run test` / `test:watch`). Choisi pour son intégration native avec l'écosystème Vite/TypeScript, sa rapidité, et l'absence de configuration lourde comparé à Jest sur un projet Next.js App Router.
+- **Statut** : Adopté. Referme le TODO_DECISION « Framework de tests » ouvert depuis le Prompt 01.
+- **Conséquence** : le paquet `server-only` lève toujours une erreur hors du pipeline de build Next.js (comportement voulu, pas un bug — Next le substitue par un no-op dans ses bundles serveur). `vitest.config.mts` l'alias vers `test/stubs/server-only.ts` pour permettre de tester le code serveur en dehors de Next.
+
+## ADR-026 — Transaction : écriture exclusivement service_role, aucune policy RLS d'écriture
+
+- **Date** : 2026-08-25
+- **Contexte** : le Prompt 08 est explicite — « Ne crée aucune possibilité de modifier librement le statut depuis le frontend ».
+- **Décision** : `transactions` et `transaction_status_events` (`supabase/migrations/0005_transactions.sql`) n'ont **aucune policy INSERT/UPDATE/DELETE** — seule la lecture (par l'expéditeur ou le destinataire) est autorisée côté client. Toute écriture passe par `src/domains/payments/transactions.ts` (`service_role`), qui est le seul point d'entrée légitime (`createTransaction`, `transitionTransaction`). Il n'existe volontairement aucune Server Action générique « changer le statut » exposée à un formulaire.
+- **Défense en profondeur** : un trigger Postgres (`check_transaction_status_transition`) rejoue la même validation de la State Machine côté base — si le TypeScript avait un bug, la base refuserait quand même la transition. Le trigger doit être maintenu en miroir exact de `src/domains/payments/transaction-status.ts`.
+- **Statut** : Adopté.
+- **Vérifié empiriquement** (tests d'intégration Vitest, `transactions.test.ts`) : idempotence par clé (aucune transaction dupliquée), transition valide journalisée dans `transaction_status_events`, transition invalide rejetée côté application (`InvalidTransactionTransitionError`) **et** côté base (contournement délibéré du service pour prouver que le trigger seul suffit à protéger l'intégrité).
+
+## ADR-027 — État `disputed` volontairement terminal
+
+- **Date** : 2026-08-25
+- **Contexte** : la State Machine documentée (`PAYMENTS — Spécification Markdown.docx`, `docs/ARCHITECTURE.md`) définit `Réglée → Inversée | Remboursée | Contestée` mais ne précise aucune transition de sortie pour l'état contesté.
+- **Décision** : `disputed` n'a aucune transition sortante dans `ALLOWED_TRANSITIONS`, plutôt que d'inventer un chemin de résolution plausible.
+- **Statut** : Adopté — TODO_DECISION ci-dessous pour le workflow de résolution des litiges.
+
 ## TODO_DECISION en attente (issues des spécifications de domaine)
 
 Ces points sont explicitement non définis dans les documents source. Ils ne doivent pas être devinés ; ils doivent être tranchés par l'utilisateur au moment où le prompt correspondant les rend bloquants.
@@ -213,10 +237,9 @@ Ces points sont explicitement non définis dans les documents source. Ils ne doi
 | Identity | Fournisseur SMS pour activer le flux téléphone + OTP (ADR-014) ; biométrie/WebAuthn (non implémentée) ; authentification supplémentaire (step-up) explicite sur nouvel appareil — actuellement seulement journalisée (`new_device_login`), pas bloquante ; politique de complexité mot de passe (au-delà du minimum 8 caractères) ; durée de vie des sessions Supabase (config par défaut non modifiée) ; rate limiting applicatif additionnel au-delà de celui de Supabase Auth |
 | Sécurité (Back Office) | RBAC sur `/admin` — voir ADR-016, **bloquant avant toute mise en production** |
 | User | Processus de changement de numéro de téléphone ; politique de changement du nom légal post-KYC (les deux restent en lecture seule dans `/settings` pour l'instant) ; intégration d'un fournisseur KYC externe (statut actuellement toujours `unverified`, jamais mis à jour automatiquement) |
-| Payments | Barème complet des frais au-delà de 3,5 %/1000 FCFA ; durée d'expiration des demandes d'argent/QR ; politique de reversal auto vs manuel ; pays/devises additionnels |
+| Payments | Barème complet des frais au-delà de 3,5 %/1000 FCFA ; durée d'expiration des demandes d'argent/QR ; politique de reversal auto vs manuel ; pays/devises additionnels ; workflow de résolution d'un statut `disputed` (ADR-027) |
 | Audit | Durée de rétention des journaux par juridiction ; liste des actions à double validation ; plateforme de stockage |
 | Observability | Plateforme d'observabilité retenue ; seuils d'alerte ; objectifs RTO/RPO |
 | Accounts / Providers | Adapters REAL pour Orange/MTN/Moov/Wave/cartes — identifiants API, contrats, endpoints à obtenir auprès de chaque fournisseur (bloquant pour toute mise en production) ; vérification de signature webhook réelle et persistance (Prompt 25) ; détection automatique `connection_expired`/`provider_unavailable` (Availability Engine, Prompt 47) |
-| Technique (ce dépôt) | Framework de tests (Vitest/Jest) |
 
 Chaque nouveau `TODO_DECISION` rencontré pendant l'implémentation doit être ajouté à ce tableau plutôt que deviné.
