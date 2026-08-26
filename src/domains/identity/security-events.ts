@@ -19,7 +19,8 @@ export type SecurityEventType =
   | "account_reconnected"
   | "account_unlinked"
   | "money_request_created"
-  | "money_request_cancelled";
+  | "money_request_cancelled"
+  | "fraud_rule_matched";
 
 /**
  * Écrit un événement de sécurité append-only. Utilise toujours le client

@@ -5,6 +5,7 @@ import { OrchestratorError, type OrchestratorErrorCode } from "./orchestrator-er
 import { validateRequest } from "./orchestrator-steps/validate";
 import { authenticateRequest } from "./orchestrator-steps/authenticate";
 import { checkRisk } from "./orchestrator-steps/risk";
+import { checkFraud } from "./orchestrator-steps/fraud";
 import { checkCompliance } from "./orchestrator-steps/compliance";
 import { checkLimits } from "./orchestrator-steps/limits";
 import { calculateFee as calculateFeeStep } from "./orchestrator-steps/fee";
@@ -137,7 +138,14 @@ export async function runPaymentOrchestrator(request: PaymentRequest): Promise<O
     transaction = (await transitionTransaction(transaction.id, "authenticated")) as Transaction;
     transaction = (await transitionTransaction(transaction.id, "processing")) as Transaction;
 
-    // → Risk → Compliance → Limits (Fee et Routing déjà résolus ci-dessus)
+    // → Risk → Compliance → Limits → Fraud (Fee et Routing déjà résolus
+    // ci-dessus). Compliance et Limits sont des portes déterministes
+    // (seuil KYC fixe, plafonds configurés) : elles passent en premier,
+    // avant l'analyse de fraude combinatoire — voir docs/DECISIONS.md
+    // ADR-046 (une transaction volumineuse d'un compte neuf déclenchait
+    // sinon presque systématiquement une revue manuelle avant même que
+    // Compliance n'ait l'occasion de statuer, y compris pour un compte
+    // par ailleurs parfaitement légitime).
     const riskDecision = await checkRisk(request);
     if (riskDecision.level === "HIGH") {
       throw new OrchestratorError(
@@ -146,8 +154,31 @@ export async function runPaymentOrchestrator(request: PaymentRequest): Promise<O
         { reasons: riskDecision.reasons }
       );
     }
+
     await checkCompliance(request);
     await checkLimits(request, route);
+
+    const fraudDecision = await checkFraud(request, riskDecision);
+    if (fraudDecision.action === "BLOCK") {
+      throw new OrchestratorError(
+        "FRAUD_BLOCKED",
+        `Bloquée par une règle anti-fraude : ${fraudDecision.matchedRules.map((r) => r.description).join("; ")}`,
+        { matchedRules: fraudDecision.matchedRules }
+      );
+    }
+    if (fraudDecision.action === "MANUAL_REVIEW") {
+      throw new OrchestratorError(
+        "MANUAL_REVIEW_REQUIRED",
+        `Revue manuelle requise : ${fraudDecision.matchedRules.map((r) => r.description).join("; ")}`,
+        { matchedRules: fraudDecision.matchedRules }
+      );
+    }
+    // STEP_UP : aucune authentification supplémentaire n'est disponible
+    // dans ce dépôt (biométrie/WebAuthn non implémentées — voir
+    // docs/DECISIONS.md, TODO_DECISION Identity). Même traitement que
+    // le step-up déjà documenté pour un nouvel appareil à la connexion
+    // (Prompt 04) : journalisé (checkFraud l'a déjà fait), jamais
+    // bloquant faute de second facteur réel à proposer.
 
     // → Provider Gateway (ignoré si virement portefeuille à portefeuille pur)
     let providerTransactionId: string | null = null;

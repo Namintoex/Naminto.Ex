@@ -309,6 +309,8 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "send.error.validation": "Certaines informations sont invalides.",
     "send.error.auth": "Échec d'authentification.",
     "send.error.risk": "Cette opération a été bloquée pour des raisons de sécurité.",
+    "send.error.fraud": "Cette opération a été bloquée par une règle anti-fraude.",
+    "send.error.manualReview": "Cette opération nécessite une revue manuelle avant de pouvoir aboutir.",
     "send.error.compliance": "Une vérification d'identité renforcée est requise pour ce montant.",
     "send.error.limit": "Cette opération dépasse une limite autorisée.",
     "send.error.provider": "Le fournisseur a refusé l'opération (solde insuffisant ou compte indisponible).",
@@ -317,6 +319,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
 
     "security.event.money_request_created": "Demande d'argent créée",
     "security.event.money_request_cancelled": "Demande d'argent annulée",
+    "security.event.fraud_rule_matched": "Règle anti-fraude déclenchée",
 
     "receive.title": "Recevoir de l'argent",
     "receive.subtitle": "Partagez votre identifiant ou ce QR pour recevoir un envoi depuis un autre utilisateur Naminto.Ex.",
@@ -745,6 +748,8 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "send.error.validation": "Some information is invalid.",
     "send.error.auth": "Authentication failed.",
     "send.error.risk": "This operation was blocked for security reasons.",
+    "send.error.fraud": "This operation was blocked by an anti-fraud rule.",
+    "send.error.manualReview": "This operation requires manual review before it can proceed.",
     "send.error.compliance": "Enhanced identity verification is required for this amount.",
     "send.error.limit": "This operation exceeds an allowed limit.",
     "send.error.provider": "The provider declined the operation (insufficient balance or account unavailable).",
@@ -753,6 +758,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
 
     "security.event.money_request_created": "Money request created",
     "security.event.money_request_cancelled": "Money request cancelled",
+    "security.event.fraud_rule_matched": "Anti-fraud rule triggered",
 
     "receive.title": "Receive money",
     "receive.subtitle": "Share your ID or this QR code to receive a transfer from another Naminto.Ex user.",

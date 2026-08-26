@@ -366,6 +366,128 @@ describe("Payment Orchestrator (intégration)", () => {
     expect(tx?.status).toBe("failed");
   });
 
+  it("MANUAL_REVIEW_REQUIRED : plusieurs signaux de risque modérés combinés (Fraud Engine, Prompt 18)", async () => {
+    // Utilisateur dédié : le montant ciblé (150 000, nouveau bénéficiaire,
+    // compte neuf) doit produire au moins trois signaux Risk MEDIUM
+    // (amount, history, beneficiary) sans dépendre de l'historique déjà
+    // accumulé par le `userId` partagé du describe.
+    const email = `vitest-orch-fraud-review-${randomUUID()}@example.test`;
+    const user = await admin.auth.admin.createUser({
+      email,
+      password: "TestPassword2026!",
+      email_confirm: true,
+      user_metadata: { naminto_id: `vitest_orch_frr_${randomUUID().slice(0, 8)}`, legal_name: "Vitest Fraud Review" },
+    });
+    if (user.error || !user.data.user) throw new Error(`Impossible de créer l'utilisateur: ${user.error?.message}`);
+    const freshUserId = user.data.user.id;
+    await admin.from("pin_credentials").insert({ user_id: freshUserId, pin_hash: await hashPin(pin) });
+
+    try {
+      const request = baseRequest({
+        senderUserId: freshUserId,
+        sourceType: "naminto_wallet",
+        destinationType: "naminto_wallet",
+        destinationExternalReference: null,
+        recipientUserId,
+        amount: 150_000,
+      });
+
+      let caught: unknown;
+      try {
+        await runPaymentOrchestrator(request);
+      } catch (err) {
+        caught = err;
+      }
+      expect(caught).toBeInstanceOf(OrchestratorError);
+      expect((caught as OrchestratorError).code).toBe("MANUAL_REVIEW_REQUIRED");
+      expect((caught as OrchestratorError).details?.matchedRules).toBeDefined();
+
+      const { data: tx } = await admin
+        .from("transactions")
+        .select("id, status")
+        .eq("idempotency_key", request.idempotencyKey)
+        .single();
+      if (tx) createdTransactionIds.push(tx.id);
+      expect(tx?.status).toBe("failed");
+    } finally {
+      await admin.auth.admin.deleteUser(freshUserId);
+    }
+  });
+
+  it("FRAUD_BLOCKED : plusieurs opérations rapprochées avec des montants non négligeables (Fraud Engine, Prompt 18)", async () => {
+    const email = `vitest-orch-fraud-block-${randomUUID()}@example.test`;
+    const user = await admin.auth.admin.createUser({
+      email,
+      password: "TestPassword2026!",
+      email_confirm: true,
+      user_metadata: { naminto_id: `vitest_orch_frb_${randomUUID().slice(0, 8)}`, legal_name: "Vitest Fraud Block" },
+    });
+    if (user.error || !user.data.user) throw new Error(`Impossible de créer l'utilisateur: ${user.error?.message}`);
+    const freshUserId = user.data.user.id;
+    await admin.from("pin_credentials").insert({ user_id: freshUserId, pin_hash: await hashPin(pin) });
+
+    const localCreatedTransactionIds: string[] = [];
+    try {
+      // Construit une fréquence MEDIUM (>= 5 opérations sur la dernière
+      // heure — voir docs/DECISIONS.md ADR-045) en réglant directement
+      // via runPaymentOrchestrator plutôt qu'en manipulant transactions.ts
+      // à la main, pour rester représentatif d'un usage réel.
+      for (let i = 0; i < 5; i += 1) {
+        const { transaction } = await runPaymentOrchestrator(
+          baseRequest({
+            senderUserId: freshUserId,
+            sourceType: "naminto_wallet",
+            destinationType: "naminto_wallet",
+            destinationExternalReference: null,
+            recipientUserId,
+            amount: 500,
+          })
+        );
+        localCreatedTransactionIds.push(transaction.id);
+      }
+
+      const request = baseRequest({
+        senderUserId: freshUserId,
+        sourceType: "naminto_wallet",
+        destinationType: "naminto_wallet",
+        destinationExternalReference: null,
+        recipientUserId,
+        amount: 150_000,
+      });
+
+      let caught: unknown;
+      try {
+        await runPaymentOrchestrator(request);
+      } catch (err) {
+        caught = err;
+      }
+      expect(caught).toBeInstanceOf(OrchestratorError);
+      expect((caught as OrchestratorError).code).toBe("FRAUD_BLOCKED");
+
+      const { data: tx } = await admin
+        .from("transactions")
+        .select("id, status")
+        .eq("idempotency_key", request.idempotencyKey)
+        .single();
+      if (tx) localCreatedTransactionIds.push(tx.id);
+      expect(tx?.status).toBe("failed");
+    } finally {
+      // Les 5 opérations réglées ont des écritures Ledger réelles
+      // (append-only, ADR-038) — jamais supprimées. Seule la dernière
+      // (bloquée, sans écriture) est nettoyable.
+      const { data: settledEntries } = await admin
+        .from("ledger_entries")
+        .select("transaction_id")
+        .in("transaction_id", localCreatedTransactionIds);
+      const settledIds = new Set((settledEntries ?? []).map((e) => e.transaction_id));
+      const deletableIds = localCreatedTransactionIds.filter((id) => !settledIds.has(id));
+      if (deletableIds.length > 0) {
+        await admin.from("transactions").delete().in("id", deletableIds);
+      }
+      await admin.auth.admin.deleteUser(freshUserId);
+    }
+  }, 60_000);
+
   it("retries sûrs : rejouer la même idempotencyKey après règlement ne réexécute aucune étape", async () => {
     const linkedAccountId = await linkSandboxAccount(`+22509${randomUUID().slice(0, 8)}`);
     const request = baseRequest({

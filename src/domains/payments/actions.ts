@@ -116,6 +116,8 @@ const ERROR_MESSAGE_KEYS: Record<string, string> = {
   VALIDATION_ERROR: "send.error.validation",
   AUTH_ERROR: "send.error.auth",
   RISK_REJECTION: "send.error.risk",
+  FRAUD_BLOCKED: "send.error.fraud",
+  MANUAL_REVIEW_REQUIRED: "send.error.manualReview",
   COMPLIANCE_REJECTION: "send.error.compliance",
   LIMIT_ERROR: "send.error.limit",
   PROVIDER_ERROR: "send.error.provider",
