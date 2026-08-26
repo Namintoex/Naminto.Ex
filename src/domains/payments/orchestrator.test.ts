@@ -486,7 +486,11 @@ describe("Payment Orchestrator (intégration)", () => {
       }
       await admin.auth.admin.deleteUser(freshUserId);
     }
-  }, 60_000);
+    // 90s : les 5 règlements déclenchent désormais un envoi de
+    // notification réel (Prompt 20, plus le STUB instantané d'avant) sur
+    // trois canaux chacun — davantage d'aller-retours réseau vers le
+    // vrai projet Supabase que ce test n'en avait au départ.
+  }, 90_000);
 
   it("retries sûrs : rejouer la même idempotencyKey après règlement ne réexécute aucune étape", async () => {
     const linkedAccountId = await linkSandboxAccount(`+22509${randomUUID().slice(0, 8)}`);

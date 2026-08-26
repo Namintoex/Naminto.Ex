@@ -29,6 +29,10 @@ export type LedgerEntryDirection = "debit" | "credit";
 export type MoneyRequestStatus = "pending" | "fulfilled" | "cancelled" | "expired";
 export type ComplianceRuleType = "PRODUCT_RULE" | "REGULATORY_RULE" | "CONFIGURATION";
 export type ComplianceRequirement = "NONE" | "KYC_STANDARD" | "KYC_ENHANCED" | "MANUAL_REVIEW";
+export type NotificationChannel = "IN_APP" | "PUSH" | "SMS";
+export type NotificationDeliveryStatus = "PENDING" | "SENT" | "FAILED";
+/** Même distinction que ProviderMode (providers/types.ts) — jamais REAL tant qu'aucun fournisseur SMS/PUSH réel n'est connecté. */
+export type ChannelMode = "REAL" | "SANDBOX" | "MOCK" | "UNAVAILABLE";
 
 export interface Database {
   public: {
@@ -46,6 +50,9 @@ export interface Database {
           preferred_currency: string;
           notifications_enabled: boolean;
           sound_enabled: boolean;
+          notify_in_app: boolean;
+          notify_push: boolean;
+          notify_sms: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -61,6 +68,9 @@ export interface Database {
           preferred_currency?: string;
           notifications_enabled?: boolean;
           sound_enabled?: boolean;
+          notify_in_app?: boolean;
+          notify_push?: boolean;
+          notify_sms?: boolean;
         };
         Update: Partial<{
           naminto_id: string;
@@ -73,6 +83,9 @@ export interface Database {
           preferred_currency: string;
           notifications_enabled: boolean;
           sound_enabled: boolean;
+          notify_in_app: boolean;
+          notify_push: boolean;
+          notify_sms: boolean;
         }>;
         Relationships: [];
       };
@@ -470,6 +483,64 @@ export interface Database {
           destination_type: DestinationType | null;
           description: string;
           active: boolean;
+        }>;
+        Relationships: [];
+      };
+      notifications: {
+        Row: {
+          id: string;
+          user_id: string;
+          event_type: string;
+          title: string;
+          body: string;
+          locale: Locale;
+          metadata: Record<string, unknown>;
+          read_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          event_type: string;
+          title: string;
+          body: string;
+          locale: Locale;
+          metadata?: Record<string, unknown>;
+          read_at?: string | null;
+        };
+        Update: Partial<{
+          read_at: string | null;
+        }>;
+        Relationships: [];
+      };
+      notification_deliveries: {
+        Row: {
+          id: string;
+          notification_id: string;
+          channel: NotificationChannel;
+          status: NotificationDeliveryStatus;
+          mode: ChannelMode;
+          attempts: number;
+          last_error: string | null;
+          sent_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          notification_id: string;
+          channel: NotificationChannel;
+          status?: NotificationDeliveryStatus;
+          mode: ChannelMode;
+          attempts?: number;
+          last_error?: string | null;
+          sent_at?: string | null;
+        };
+        Update: Partial<{
+          status: NotificationDeliveryStatus;
+          attempts: number;
+          last_error: string | null;
+          sent_at: string | null;
         }>;
         Relationships: [];
       };

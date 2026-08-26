@@ -2,20 +2,28 @@
 
 import type { ReactNode } from "react";
 import { useLocale } from "@/design-system/i18n/locale-provider";
+import type { Database } from "@/lib/supabase/database.types";
 import { Header } from "./header";
 import { MobileNav } from "./mobile-nav";
 import { Sidebar } from "./sidebar";
 import { adminNavItems, userNavItems } from "./nav-config";
 
+type NotificationRow = Pick<
+  Database["public"]["Tables"]["notifications"]["Row"],
+  "id" | "title" | "body" | "read_at" | "created_at"
+>;
+
 export function Shell({
   variant,
   homeHref,
   userDisplayName,
+  notifications,
   children,
 }: {
   variant: "user" | "admin";
   homeHref: string;
   userDisplayName?: string | null;
+  notifications?: NotificationRow[];
   children: ReactNode;
 }) {
   const { t } = useLocale();
@@ -32,6 +40,7 @@ export function Shell({
         darkLabel={t("theme.dark")}
         variant={variant}
         userDisplayName={userDisplayName}
+        notifications={notifications}
       />
       <div className="flex flex-1">
         <Sidebar items={navItems} />

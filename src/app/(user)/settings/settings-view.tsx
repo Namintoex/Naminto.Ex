@@ -28,6 +28,9 @@ type Profile = Pick<
   | "preferred_currency"
   | "notifications_enabled"
   | "sound_enabled"
+  | "notify_in_app"
+  | "notify_push"
+  | "notify_sms"
 >;
 
 function kycBadgeVariant(status: Profile["kyc_status"]) {
@@ -145,6 +148,26 @@ export function SettingsView({ profile, email }: { profile: Profile; email: stri
               label={t("settings.preferences.sound")}
               defaultChecked={profile.sound_enabled}
             />
+            <div className="flex flex-col gap-3 border-t border-border-default pt-4">
+              <p className="text-xs font-medium text-text-secondary">
+                {t("settings.preferences.channels.section")}
+              </p>
+              <Switch
+                name="notifyInApp"
+                label={t("settings.preferences.channels.inApp")}
+                defaultChecked={profile.notify_in_app}
+              />
+              <Switch
+                name="notifyPush"
+                label={t("settings.preferences.channels.push")}
+                defaultChecked={profile.notify_push}
+              />
+              <Switch
+                name="notifySms"
+                label={t("settings.preferences.channels.sms")}
+                defaultChecked={profile.notify_sms}
+              />
+            </div>
             <Button type="submit" loading={pending} className="self-start">
               {t("settings.preferences.save")}
             </Button>

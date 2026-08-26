@@ -12,7 +12,7 @@ import { calculateFee as calculateFeeStep } from "./orchestrator-steps/fee";
 import { routeRequest } from "./orchestrator-steps/routing";
 import { executeProviderTransfer } from "./orchestrator-steps/execute-provider";
 import { writeLedgerEntries } from "./orchestrator-steps/ledger";
-import { notifyTransactionSettled } from "./orchestrator-steps/notification";
+import { notifyTransactionFailed, notifyTransactionSettled } from "./orchestrator-steps/notification";
 import { scheduleReconciliation } from "./orchestrator-steps/reconciliation";
 import type { PaymentRequest, ResolvedRoute } from "./orchestrator-steps/types";
 import type { Database } from "@/lib/supabase/database.types";
@@ -199,8 +199,21 @@ export async function runPaymentOrchestrator(request: PaymentRequest): Promise<O
 
     transaction = (await transitionTransaction(transaction.id, "settled")) as Transaction;
 
-    // → Notification → Reconciliation
-    await notifyTransactionSettled(transaction.id);
+    // → Notification → Reconciliation. Un règlement déjà confirmé est
+    // définitif : aucun échec après ce point ne doit annuler ni faire
+    // échouer l'orchestrateur (Prompt 20 — « une panne SMS ne doit
+    // jamais annuler une transaction financière déjà confirmée »).
+    // notifyTransactionSettled ne lève déjà jamais, mais ce try/catch
+    // reste une défense en profondeur explicite à cet endroit précis du
+    // pipeline plutôt qu'une confiance implicite dans son implémentation.
+    try {
+      await notifyTransactionSettled(transaction);
+    } catch (err) {
+      console.error(
+        "[orchestrator] notifyTransactionSettled a échoué après règlement — transaction non affectée",
+        err
+      );
+    }
     await scheduleReconciliation(transaction.id);
 
     return { transaction, replayed: false };
@@ -217,6 +230,15 @@ export async function runPaymentOrchestrator(request: PaymentRequest): Promise<O
       orchestratorError.code === "TIMEOUT" ? "expired" : failureStatusFor(phase);
 
     await safeTransition(transaction.id, targetStatus, `${orchestratorError.code}: ${orchestratorError.message}`);
+
+    // Symétrique du cas settled ci-dessus : une panne de notification ne
+    // doit jamais masquer l'erreur d'origine, qui reste seule à remonter
+    // à l'appelant.
+    try {
+      await notifyTransactionFailed(transaction, orchestratorError.code);
+    } catch (notifyErr) {
+      console.error("[orchestrator] notifyTransactionFailed a échoué", notifyErr);
+    }
 
     throw orchestratorError;
   }

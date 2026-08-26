@@ -19,6 +19,9 @@ export async function updatePreferencesAction(
   const preferredCurrency = String(formData.get("preferredCurrency") ?? "");
   const notificationsEnabled = formData.get("notificationsEnabled") === "on";
   const soundEnabled = formData.get("soundEnabled") === "on";
+  const notifyInApp = formData.get("notifyInApp") === "on";
+  const notifyPush = formData.get("notifyPush") === "on";
+  const notifySms = formData.get("notifySms") === "on";
 
   if (!SUPPORTED_LOCALES.includes(preferredLanguage as Locale)) {
     return { error: "form.error.required" };
@@ -42,6 +45,9 @@ export async function updatePreferencesAction(
       preferred_currency: preferredCurrency,
       notifications_enabled: notificationsEnabled,
       sound_enabled: soundEnabled,
+      notify_in_app: notifyInApp,
+      notify_push: notifyPush,
+      notify_sms: notifySms,
     })
     .eq("user_id", user.id);
 
@@ -57,6 +63,9 @@ export async function updatePreferencesAction(
       preferredCurrency,
       notificationsEnabled,
       soundEnabled,
+      notifyInApp,
+      notifyPush,
+      notifySms,
     },
   });
 

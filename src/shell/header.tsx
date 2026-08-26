@@ -1,7 +1,13 @@
 import Link from "next/link";
 import { Badge, LocaleToggle, ThemeToggle } from "@/design-system";
+import type { Database } from "@/lib/supabase/database.types";
 import { NotificationsMenu } from "./notifications-menu";
 import { ProfileMenu } from "./profile-menu";
+
+type NotificationRow = Pick<
+  Database["public"]["Tables"]["notifications"]["Row"],
+  "id" | "title" | "body" | "read_at" | "created_at"
+>;
 
 export function Header({
   homeHref,
@@ -11,6 +17,7 @@ export function Header({
   darkLabel,
   variant,
   userDisplayName,
+  notifications,
 }: {
   homeHref: string;
   spaceLabel: string;
@@ -19,6 +26,7 @@ export function Header({
   darkLabel: string;
   variant: "user" | "admin";
   userDisplayName?: string | null;
+  notifications?: NotificationRow[];
 }) {
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-border-default bg-surface-raised px-3 sm:gap-3 sm:px-6">
@@ -31,7 +39,7 @@ export function Header({
         </Badge>
       </Link>
       <div className="ml-auto flex items-center gap-1 sm:gap-1.5">
-        <NotificationsMenu />
+        <NotificationsMenu notifications={notifications} />
         <LocaleToggle />
         <ThemeToggle lightLabel={lightLabel} darkLabel={darkLabel} />
         <ProfileMenu variant={variant} displayName={userDisplayName} />

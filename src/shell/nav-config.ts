@@ -43,6 +43,7 @@ export const userNavItems: NavItem[] = [
   { href: "/history", labelKey: "nav.history", icon: History, primary: true },
   { href: "/request", labelKey: "nav.request", icon: HandCoins },
   { href: "/accounts", labelKey: "nav.accounts", icon: Link2 },
+  { href: "/notifications", labelKey: "nav.notifications", icon: Bell },
   { href: "/assist", labelKey: "nav.assist", icon: MessageCircle },
   { href: "/security", labelKey: "nav.security", icon: ShieldCheck },
   { href: "/trust", labelKey: "nav.trust", icon: Landmark },
