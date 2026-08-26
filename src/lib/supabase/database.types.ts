@@ -27,6 +27,8 @@ export type LedgerAccountOwnerType = "user_wallet" | "provider_suspense" | "fee_
 export type LedgerEntryKind = "settlement" | "reversal" | "refund";
 export type LedgerEntryDirection = "debit" | "credit";
 export type MoneyRequestStatus = "pending" | "fulfilled" | "cancelled" | "expired";
+export type ComplianceRuleType = "PRODUCT_RULE" | "REGULATORY_RULE" | "CONFIGURATION";
+export type ComplianceRequirement = "NONE" | "KYC_STANDARD" | "KYC_ENHANCED" | "MANUAL_REVIEW";
 
 export interface Database {
   public: {
@@ -425,6 +427,49 @@ export interface Database {
           status: MoneyRequestStatus;
           fulfilled_transaction_id: string | null;
           expires_at: string;
+        }>;
+        Relationships: [];
+      };
+      compliance_rules: {
+        Row: {
+          id: string;
+          rule_type: ComplianceRuleType;
+          requirement: ComplianceRequirement;
+          country: string | null;
+          currency: string | null;
+          min_amount: number | null;
+          max_amount: number | null;
+          source_type: SourceType | null;
+          destination_type: DestinationType | null;
+          description: string;
+          active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          rule_type: ComplianceRuleType;
+          requirement: ComplianceRequirement;
+          country?: string | null;
+          currency?: string | null;
+          min_amount?: number | null;
+          max_amount?: number | null;
+          source_type?: SourceType | null;
+          destination_type?: DestinationType | null;
+          description: string;
+          active?: boolean;
+        };
+        Update: Partial<{
+          rule_type: ComplianceRuleType;
+          requirement: ComplianceRequirement;
+          country: string | null;
+          currency: string | null;
+          min_amount: number | null;
+          max_amount: number | null;
+          source_type: SourceType | null;
+          destination_type: DestinationType | null;
+          description: string;
+          active: boolean;
         }>;
         Relationships: [];
       };

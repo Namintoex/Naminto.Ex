@@ -343,8 +343,21 @@ Domaine implémenté dans `src/domains/accounts/`, page `/accounts` (`src/app/(u
 - **Vérifié manuellement et par 24 tests** (règles pures + bout-en-bout orchestrateur, dont un compte neuf combinant 3 signaux MEDIUM → `MANUAL_REVIEW_REQUIRED`, et 5 opérations rapprochées suivies d'un montant non négligeable → `FRAUD_BLOCKED`) : suite complète (144 tests) toujours au vert, envoi normal réellement exécuté dans le navigateur sans interférence.
 - **Non couvert à ce stade** : file d'attente de revue manuelle (aucun écran Back Office ne permet de statuer sur une transaction en `MANUAL_REVIEW_REQUIRED` — Prompt 22+) ; second facteur d'authentification réel pour STEP_UP ; règles configurables en base.
 
-## 30. Prochaines étapes
+## 30. Compliance Engine (Prompt 19)
+
+`src/domains/payments/compliance-engine/` — remplace le seuil codé en dur `ENHANCED_KYC_THRESHOLD_XOF = 200_000` posé au Prompt 09 par une table `compliance_rules` configurable, exactement le même schéma de pattern que le Fee Engine (Prompt 10) et le Limit Engine (Prompt 11) : dimensions à `NULL` = joker, `pickMostSpecific` (`shared/pick-most-specific.ts`) retient la règle active la plus spécifique.
+
+- **`compliance_rules`** (migration `0011_compliance_rules.sql`) : `rule_type` (`PRODUCT_RULE`/`REGULATORY_RULE`/`CONFIGURATION` — la distinction explicitement exigée par le Prompt 19, purement documentaire pour l'instant, aucune logique ne branche encore dessus), `requirement` (`NONE`/`KYC_STANDARD`/`KYC_ENHANCED`/`MANUAL_REVIEW`), dimensions `country`/`currency`/`source_type`/`destination_type`/`min_amount`/`max_amount`. RLS activée, **aucune politique cliente** — lecture et écriture réservées au `service_role`, même choix que `fee_rules`/`limit_rules`.
+- **Règle seedée à l'application de la migration** : une unique `REGULATORY_RULE` XOF, `min_amount = 200 000,01`, `requirement = KYC_ENHANCED` — reproduit exactement la sémantique de l'ancien `amount > 200_000` codé en dur, pour ne casser aucun comportement existant lors de la bascule.
+- **`determineRequirement`** (`determine-requirement.ts`) : aucune règle correspondante ⇒ `NONE`, jamais un refus — même principe que le Limit Engine (ADR-036). Retourne toujours `ruleId`/`ruleType`/`description` pour l'audit, même quand `NONE`.
+- **`orchestrator-steps/compliance.ts` réécrit** : délègue entièrement à `determineRequirement`, plus aucune comparaison de montant codée dans l'étape orchestrateur. Toute exigence non `NONE` produit un `security_events` (`compliance_requirement_applied`) — audit systématique, avant même de savoir si la transaction sera finalement acceptée ou rejetée. `MANUAL_REVIEW` réutilise tel quel le code `MANUAL_REVIEW_REQUIRED` posé au Prompt 18 (Fraud Engine), plutôt que d'en dupliquer un ; `KYC_STANDARD`/`KYC_ENHANCED` rejettent avec `COMPLIANCE_REJECTION` si `identity_profiles.kyc_status !== 'verified'`.
+- **Gap explicitement assumé (TODO_DECISION, voir ADR-047)** : ce dépôt ne modélise qu'un statut KYC binaire (`identity_profiles.kyc_status: verified | unverified | ...`) — `KYC_STANDARD` et `KYC_ENHANCED` exigent donc aujourd'hui exactement la même chose (`verified`). Une distinction réelle entre les deux paliers (pièces différentes, seuils de vérification différents) demanderait un nouveau champ, hors du périmètre du Prompt 19 tel qu'énoncé.
+- **`settings.kyc.threshold` (UI) non reconnecté** : le texte affiché reste « 200 000 FCFA » codé en dur plutôt que lu dynamiquement depuis `compliance_rules` — risque de dérive documenté, pas corrigé, pour éviter le scope creep (l'énoncé du Prompt 19 porte sur le moteur, pas sur cet écran).
+- **Vérifié par 21 tests** (`match-rule.test.ts` — purs, sans DB ; `determine-requirement.test.ts` — intégration contre le vrai Supabase : absence de règle ⇒ `NONE`, seuil 200 000 XOF seedé, spécificité pays > devise, scénario `MANUAL_REVIEW`) et par la suite complète existante (`orchestrator.test.ts`, dont le test `COMPLIANCE_REJECTION` déjà en place, toujours au vert sans modification — la règle seedée reproduit exactement l'ancien seuil).
+- **Non couvert à ce stade** : distinction réelle `KYC_STANDARD`/`KYC_ENHANCED` ; jeu de règles de conformité au-delà de l'unique règle seedée (pas de règles par pays, par fournisseur, etc. — à ajouter au fil de l'eau via la table, sans code) ; écran Back Office pour gérer `compliance_rules` (aucun des moteurs configurables — Fee/Limit/Compliance — n'a encore d'UI d'administration, Prompt 22+).
+
+## 31. Prochaines étapes
 
 Conformément au protocole, les prompts sont exécutés un par un avec validation entre chaque étape :
 
-- **Prompt 19** — à confirmer avec l'utilisateur avant de commencer.
+- **Prompt 20** — à confirmer avec l'utilisateur avant de commencer.
