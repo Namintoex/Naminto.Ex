@@ -23,7 +23,9 @@ export type SecurityEventType =
   | "fraud_rule_matched"
   | "compliance_requirement_applied"
   | "kyc_status_changed"
-  | "support_ticket_status_changed";
+  | "support_ticket_status_changed"
+  | "admin_role_changed"
+  | "user_status_changed";
 
 /**
  * Écrit un événement de sécurité append-only. Utilise toujours le client

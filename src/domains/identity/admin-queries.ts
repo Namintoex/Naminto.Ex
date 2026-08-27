@@ -120,3 +120,36 @@ export async function adminUpdateKycStatus(userId: string, next: KycStatus): Pro
 
   return { ok: true };
 }
+
+export type AdminSetUserSuspendedResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * Back Office — Users (Prompt 23, permission `user.suspend` explicitement
+ * nommée dans le prompt). `identity_profiles.status` connaît déjà
+ * `suspended` depuis le Prompt 04 (jamais utilisé jusqu'ici, faute
+ * d'action pour l'atteindre). Ne touche jamais `active`/`closed` — un
+ * compte `pending_verification` suspendu revient à `active`, pas à son
+ * état d'origine, choix simple assumé (aucune source ne documente de
+ * nuance ici).
+ */
+export async function adminSetUserSuspended(userId: string, suspended: boolean): Promise<AdminSetUserSuspendedResult> {
+  const admin = createAdminClient();
+  const { data: profile } = await admin.from("identity_profiles").select("status").eq("user_id", userId).maybeSingle();
+  if (!profile) return { ok: false, error: "admin.users.error.notFound" };
+
+  const next = suspended ? "suspended" : "active";
+  if (profile.status === next) {
+    return { ok: false, error: "admin.users.error.alreadyInStatus" };
+  }
+
+  const { error } = await admin.from("identity_profiles").update({ status: next }).eq("user_id", userId);
+  if (error) return { ok: false, error: "admin.users.error.updateFailed" };
+
+  await logSecurityEvent({
+    userId,
+    type: "user_status_changed",
+    metadata: { from: profile.status, to: next },
+  });
+
+  return { ok: true };
+}

@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { useLocale } from "@/design-system/i18n/locale-provider";
 import type { Database } from "@/lib/supabase/database.types";
+import type { Permission } from "@/domains/rbac/types";
 import { Header } from "./header";
 import { MobileNav } from "./mobile-nav";
 import { Sidebar } from "./sidebar";
@@ -18,16 +19,23 @@ export function Shell({
   homeHref,
   userDisplayName,
   notifications,
+  permissions,
   children,
 }: {
   variant: "user" | "admin";
   homeHref: string;
   userDisplayName?: string | null;
   notifications?: NotificationRow[];
+  /** Prompt 23 — filtre les items admin (cosmétique : l'accès réel est gardé côté serveur sur chaque page/action). */
+  permissions?: Permission[];
   children: ReactNode;
 }) {
   const { t } = useLocale();
-  const navItems = variant === "admin" ? adminNavItems : userNavItems;
+  const allNavItems = variant === "admin" ? adminNavItems : userNavItems;
+  const navItems =
+    variant === "admin" && permissions
+      ? allNavItems.filter((item) => !item.permission || permissions.includes(item.permission))
+      : allNavItems;
   const spaceLabel = variant === "admin" ? t("shell.backOffice") : t("shell.userApp");
 
   return (

@@ -12,6 +12,7 @@ import {
   HandCoins,
   HelpCircle,
   History,
+  KeyRound,
   LayoutDashboard,
   LifeBuoy,
   Link2,
@@ -27,6 +28,7 @@ import {
   Users,
   type LucideIcon,
 } from "lucide-react";
+import type { Permission } from "@/domains/rbac/types";
 
 export type NavItem = {
   href: string;
@@ -34,6 +36,8 @@ export type NavItem = {
   icon: LucideIcon;
   /** Affiché dans la barre d'onglets mobile (sous-ensemble restreint). */
   primary?: boolean;
+  /** Prompt 23 — absente = visible par tout rôle admin (ex. modules encore STUB). */
+  permission?: Permission;
 };
 
 export const userNavItems: NavItem[] = [
@@ -51,21 +55,28 @@ export const userNavItems: NavItem[] = [
 ];
 
 export const adminNavItems: NavItem[] = [
-  { href: "/admin", labelKey: "nav.admin.dashboard", icon: LayoutDashboard, primary: true },
-  { href: "/admin/users", labelKey: "nav.admin.users", icon: Users, primary: true },
-  { href: "/admin/transactions", labelKey: "nav.admin.transactions", icon: ArrowLeftRight, primary: true },
-  { href: "/admin/ledger", labelKey: "nav.admin.ledger", icon: BookOpen, primary: true },
-  { href: "/admin/kyc", labelKey: "nav.admin.kyc", icon: BadgeCheck },
-  { href: "/admin/providers", labelKey: "nav.admin.providers", icon: Plug },
+  { href: "/admin", labelKey: "nav.admin.dashboard", icon: LayoutDashboard, primary: true, permission: "dashboard.read" },
+  { href: "/admin/users", labelKey: "nav.admin.users", icon: Users, primary: true, permission: "user.read" },
+  {
+    href: "/admin/transactions",
+    labelKey: "nav.admin.transactions",
+    icon: ArrowLeftRight,
+    primary: true,
+    permission: "transaction.read",
+  },
+  { href: "/admin/ledger", labelKey: "nav.admin.ledger", icon: BookOpen, primary: true, permission: "ledger.read" },
+  { href: "/admin/kyc", labelKey: "nav.admin.kyc", icon: BadgeCheck, permission: "kyc.read" },
+  { href: "/admin/providers", labelKey: "nav.admin.providers", icon: Plug, permission: "provider.read" },
   { href: "/admin/reconciliation", labelKey: "nav.admin.reconciliation", icon: GitCompare },
-  { href: "/admin/risk", labelKey: "nav.admin.risk", icon: AlertTriangle },
-  { href: "/admin/fraud", labelKey: "nav.admin.fraud", icon: ShieldAlert },
-  { href: "/admin/support", labelKey: "nav.admin.support", icon: LifeBuoy },
-  { href: "/admin/pricing", labelKey: "nav.admin.pricing", icon: Percent },
-  { href: "/admin/countries", labelKey: "nav.admin.countries", icon: Globe },
-  { href: "/admin/faq", labelKey: "nav.admin.faq", icon: HelpCircle },
-  { href: "/admin/legal", labelKey: "nav.admin.legal", icon: Scale },
-  { href: "/admin/notifications", labelKey: "nav.admin.notifications", icon: Bell },
+  { href: "/admin/risk", labelKey: "nav.admin.risk", icon: AlertTriangle, permission: "risk.read" },
+  { href: "/admin/fraud", labelKey: "nav.admin.fraud", icon: ShieldAlert, permission: "fraud.read" },
+  { href: "/admin/support", labelKey: "nav.admin.support", icon: LifeBuoy, permission: "support.read" },
+  { href: "/admin/pricing", labelKey: "nav.admin.pricing", icon: Percent, permission: "pricing.read" },
+  { href: "/admin/countries", labelKey: "nav.admin.countries", icon: Globe, permission: "country.manage" },
+  { href: "/admin/faq", labelKey: "nav.admin.faq", icon: HelpCircle, permission: "faq.manage" },
+  { href: "/admin/legal", labelKey: "nav.admin.legal", icon: Scale, permission: "legal.manage" },
+  { href: "/admin/notifications", labelKey: "nav.admin.notifications", icon: Bell, permission: "notification.read" },
   { href: "/admin/incidents", labelKey: "nav.admin.incidents", icon: Siren },
-  { href: "/admin/audit", labelKey: "nav.admin.audit", icon: ClipboardList },
+  { href: "/admin/audit", labelKey: "nav.admin.audit", icon: ClipboardList, permission: "audit.read" },
+  { href: "/admin/roles", labelKey: "nav.admin.roles", icon: KeyRound, permission: "role.manage" },
 ];

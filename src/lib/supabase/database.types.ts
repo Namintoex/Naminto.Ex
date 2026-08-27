@@ -36,6 +36,16 @@ export type ChannelMode = "REAL" | "SANDBOX" | "MOCK" | "UNAVAILABLE";
 export type TicketCategory = "transaction_issue" | "fees" | "account" | "other";
 export type TicketStatus = "open" | "in_progress" | "resolved" | "closed";
 export type LegalDocumentType = "terms" | "privacy" | "pricing_disclosure" | "other";
+export type AdminRole =
+  | "support"
+  | "kyc"
+  | "compliance"
+  | "risk"
+  | "finance"
+  | "operations"
+  | "security"
+  | "legal"
+  | "super_admin";
 
 export interface Database {
   public: {
@@ -658,6 +668,21 @@ export interface Database {
           version: string;
           published: boolean;
         }>;
+        Relationships: [];
+      };
+      admin_role_assignments: {
+        Row: {
+          id: string;
+          user_id: string;
+          role: AdminRole;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          role: AdminRole;
+        };
+        Update: never;
         Relationships: [];
       };
     };

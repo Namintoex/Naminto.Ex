@@ -91,6 +91,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "nav.admin.notifications": "Notifications",
     "nav.admin.incidents": "Incidents",
     "nav.admin.audit": "Audit",
+    "nav.admin.roles": "Rôles",
 
     "comingSoon.title": "Bientôt disponible",
     "comingSoon.body":
@@ -330,6 +331,8 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "security.event.fraud_rule_matched": "Règle anti-fraude déclenchée",
     "security.event.kyc_status_changed": "Statut KYC modifié",
     "security.event.support_ticket_status_changed": "Statut d'un dossier support modifié",
+    "security.event.admin_role_changed": "Rôle Back Office modifié",
+    "security.event.user_status_changed": "Statut du compte modifié",
 
     "receive.title": "Recevoir de l'argent",
     "receive.subtitle": "Partagez votre identifiant ou ce QR pour recevoir un envoi depuis un autre utilisateur Naminto.Ex.",
@@ -666,6 +669,37 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "admin.common.save": "Enregistrer",
     "admin.common.pagination.previous": "Précédent",
     "admin.common.pagination.next": "Suivant",
+
+    "admin.error.forbidden": "Vous n'avez pas la permission d'effectuer cette action.",
+
+    "admin.forbidden.title": "Accès refusé",
+    "admin.forbidden.body": "Votre compte n'a pas la permission d'accéder à cette page (ou à aucun module du Back Office). Contactez un Super Admin si vous pensez que c'est une erreur.",
+    "admin.forbidden.backToApp": "Retour à l'application",
+
+    "admin.users.action.suspend": "Suspendre",
+    "admin.users.action.reactivate": "Réactiver",
+    "admin.users.error.alreadyInStatus": "Le compte est déjà dans cet état.",
+
+    "admin.roles.assign.title": "Attribuer un rôle",
+    "admin.roles.assign.namintoId": "Identifiant Naminto.Ex",
+    "admin.roles.assign.role": "Rôle",
+    "admin.roles.assign.submit": "Attribuer",
+    "admin.roles.empty": "Aucun rôle attribué.",
+    "admin.roles.column.namintoId": "Identifiant",
+    "admin.roles.column.roles": "Rôles",
+    "admin.roles.revoke": "Retirer ce rôle",
+    "admin.roles.error.alreadyAssigned": "Ce rôle est déjà attribué à ce compte.",
+    "admin.roles.error.updateFailed": "La mise à jour des rôles a échoué.",
+    "admin.roles.error.userNotFound": "Aucun compte avec cet identifiant.",
+    "admin.roles.role.support": "Support",
+    "admin.roles.role.kyc": "KYC",
+    "admin.roles.role.compliance": "Conformité",
+    "admin.roles.role.risk": "Risque",
+    "admin.roles.role.finance": "Finance",
+    "admin.roles.role.operations": "Opérations",
+    "admin.roles.role.security": "Sécurité",
+    "admin.roles.role.legal": "Juridique",
+    "admin.roles.role.super_admin": "Super Admin",
   },
   en: {
     "designSystem.title": "Naminto.Ex Design System",
@@ -753,6 +787,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "nav.admin.notifications": "Notifications",
     "nav.admin.incidents": "Incidents",
     "nav.admin.audit": "Audit",
+    "nav.admin.roles": "Roles",
 
     "comingSoon.title": "Coming soon",
     "comingSoon.body":
@@ -992,6 +1027,8 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "security.event.fraud_rule_matched": "Anti-fraud rule triggered",
     "security.event.kyc_status_changed": "KYC status changed",
     "security.event.support_ticket_status_changed": "Support ticket status changed",
+    "security.event.admin_role_changed": "Back Office role changed",
+    "security.event.user_status_changed": "Account status changed",
 
     "receive.title": "Receive money",
     "receive.subtitle": "Share your ID or this QR code to receive a transfer from another Naminto.Ex user.",
@@ -1328,5 +1365,36 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "admin.common.save": "Save",
     "admin.common.pagination.previous": "Previous",
     "admin.common.pagination.next": "Next",
+
+    "admin.error.forbidden": "You don't have permission to perform this action.",
+
+    "admin.forbidden.title": "Access denied",
+    "admin.forbidden.body": "Your account doesn't have permission to access this page (or any Back Office module). Contact a Super Admin if you think this is a mistake.",
+    "admin.forbidden.backToApp": "Back to the app",
+
+    "admin.users.action.suspend": "Suspend",
+    "admin.users.action.reactivate": "Reactivate",
+    "admin.users.error.alreadyInStatus": "The account is already in that state.",
+
+    "admin.roles.assign.title": "Assign a role",
+    "admin.roles.assign.namintoId": "Naminto.Ex ID",
+    "admin.roles.assign.role": "Role",
+    "admin.roles.assign.submit": "Assign",
+    "admin.roles.empty": "No roles assigned.",
+    "admin.roles.column.namintoId": "ID",
+    "admin.roles.column.roles": "Roles",
+    "admin.roles.revoke": "Remove this role",
+    "admin.roles.error.alreadyAssigned": "This role is already assigned to this account.",
+    "admin.roles.error.updateFailed": "Role update failed.",
+    "admin.roles.error.userNotFound": "No account with that ID.",
+    "admin.roles.role.support": "Support",
+    "admin.roles.role.kyc": "KYC",
+    "admin.roles.role.compliance": "Compliance",
+    "admin.roles.role.risk": "Risk",
+    "admin.roles.role.finance": "Finance",
+    "admin.roles.role.operations": "Operations",
+    "admin.roles.role.security": "Security",
+    "admin.roles.role.legal": "Legal",
+    "admin.roles.role.super_admin": "Super Admin",
   },
 };

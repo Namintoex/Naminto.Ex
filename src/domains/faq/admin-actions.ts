@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { checkPermission } from "@/domains/rbac";
 import { adminCreateFaqEntry, adminSetFaqEntryActive, type AdminActionResult } from "./admin-mutations";
 import type { Locale } from "@/lib/supabase/database.types";
 
@@ -12,12 +13,18 @@ export async function adminCreateFaqEntryAction(input: {
   question: string;
   answer: string;
 }): Promise<AdminActionResult> {
+  const auth = await checkPermission("faq.manage");
+  if (!auth.ok) return { ok: false, error: "admin.error.forbidden" };
+
   const result = await adminCreateFaqEntry(input);
   if (result.ok) revalidatePath("/admin/faq");
   return result;
 }
 
 export async function adminSetFaqEntryActiveAction(id: string, active: boolean): Promise<AdminActionResult> {
+  const auth = await checkPermission("faq.manage");
+  if (!auth.ok) return { ok: false, error: "admin.error.forbidden" };
+
   const result = await adminSetFaqEntryActive(id, active);
   if (result.ok) revalidatePath("/admin/faq");
   return result;
