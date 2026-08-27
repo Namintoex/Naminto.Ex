@@ -35,6 +35,7 @@ export type NotificationDeliveryStatus = "PENDING" | "SENT" | "FAILED";
 export type ChannelMode = "REAL" | "SANDBOX" | "MOCK" | "UNAVAILABLE";
 export type TicketCategory = "transaction_issue" | "fees" | "account" | "other";
 export type TicketStatus = "open" | "in_progress" | "resolved" | "closed";
+export type LegalDocumentType = "terms" | "privacy" | "pricing_disclosure" | "other";
 
 export interface Database {
   public: {
@@ -569,6 +570,93 @@ export interface Database {
         };
         Update: Partial<{
           status: TicketStatus;
+        }>;
+        Relationships: [];
+      };
+      countries: {
+        Row: {
+          id: string;
+          code: string;
+          name: string;
+          currency: string;
+          active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          code: string;
+          name: string;
+          currency?: string;
+          active?: boolean;
+        };
+        Update: Partial<{
+          code: string;
+          name: string;
+          currency: string;
+          active: boolean;
+        }>;
+        Relationships: [];
+      };
+      faq_entries: {
+        Row: {
+          id: string;
+          locale: Locale;
+          category: string;
+          question: string;
+          answer: string;
+          active: boolean;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          locale: Locale;
+          category?: string;
+          question: string;
+          answer: string;
+          active?: boolean;
+          sort_order?: number;
+        };
+        Update: Partial<{
+          locale: Locale;
+          category: string;
+          question: string;
+          answer: string;
+          active: boolean;
+          sort_order: number;
+        }>;
+        Relationships: [];
+      };
+      legal_documents: {
+        Row: {
+          id: string;
+          type: LegalDocumentType;
+          locale: Locale;
+          title: string;
+          content: string;
+          version: string;
+          published: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          type: LegalDocumentType;
+          locale: Locale;
+          title: string;
+          content: string;
+          version?: string;
+          published?: boolean;
+        };
+        Update: Partial<{
+          type: LegalDocumentType;
+          locale: Locale;
+          title: string;
+          content: string;
+          version: string;
+          published: boolean;
         }>;
         Relationships: [];
       };

@@ -1,5 +1,7 @@
-import { ComingSoonPage } from "@/shell/coming-soon-page";
+import { adminListFaqEntries } from "@/domains/faq/queries";
+import { FaqView } from "./faq-view";
 
-export default function Page() {
-  return <ComingSoonPage titleKey="nav.admin.faq" />;
+export default async function AdminFaqPage() {
+  const entries = await adminListFaqEntries();
+  return <FaqView entries={entries} />;
 }

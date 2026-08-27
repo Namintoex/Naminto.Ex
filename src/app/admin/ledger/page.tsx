@@ -1,5 +1,16 @@
-import { ComingSoonPage } from "@/shell/coming-soon-page";
+import { adminListLedgerAccounts, adminListLedgerEntries } from "@/domains/payments/ledger";
+import { LedgerView } from "./ledger-view";
 
-export default function Page() {
-  return <ComingSoonPage titleKey="nav.admin.ledger" />;
+export default async function AdminLedgerPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ account?: string }>;
+}) {
+  const sp = await searchParams;
+  const [accounts, entries] = await Promise.all([
+    adminListLedgerAccounts(),
+    adminListLedgerEntries(sp.account),
+  ]);
+
+  return <LedgerView accounts={accounts} entries={entries} />;
 }

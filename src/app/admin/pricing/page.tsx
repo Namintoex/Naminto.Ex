@@ -1,5 +1,14 @@
-import { ComingSoonPage } from "@/shell/coming-soon-page";
+import { adminListFeeRules } from "@/domains/payments/fee-engine";
+import { adminListLimitRules } from "@/domains/payments/limit-engine";
+import { adminListComplianceRules } from "@/domains/payments/compliance-engine";
+import { PricingView } from "./pricing-view";
 
-export default function Page() {
-  return <ComingSoonPage titleKey="nav.admin.pricing" />;
+export default async function AdminPricingPage() {
+  const [feeRules, limitRules, complianceRules] = await Promise.all([
+    adminListFeeRules(),
+    adminListLimitRules(),
+    adminListComplianceRules(),
+  ]);
+
+  return <PricingView feeRules={feeRules} limitRules={limitRules} complianceRules={complianceRules} />;
 }

@@ -132,7 +132,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           className={cn(fieldControlClasses, "cursor-pointer", className)}
           aria-invalid={Boolean(errorText)}
           required={required}
-          defaultValue={props.defaultValue ?? ""}
+          {...(props.value === undefined ? { defaultValue: props.defaultValue ?? "" } : {})}
           {...props}
         >
           {placeholder && (

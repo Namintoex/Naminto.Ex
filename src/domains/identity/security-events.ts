@@ -21,7 +21,9 @@ export type SecurityEventType =
   | "money_request_created"
   | "money_request_cancelled"
   | "fraud_rule_matched"
-  | "compliance_requirement_applied";
+  | "compliance_requirement_applied"
+  | "kyc_status_changed"
+  | "support_ticket_status_changed";
 
 /**
  * Écrit un événement de sécurité append-only. Utilise toujours le client

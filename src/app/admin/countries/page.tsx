@@ -1,5 +1,7 @@
-import { ComingSoonPage } from "@/shell/coming-soon-page";
+import { listCountries } from "@/domains/countries/queries";
+import { CountriesView } from "./countries-view";
 
-export default function Page() {
-  return <ComingSoonPage titleKey="nav.admin.countries" />;
+export default async function AdminCountriesPage() {
+  const countries = await listCountries();
+  return <CountriesView countries={countries} />;
 }

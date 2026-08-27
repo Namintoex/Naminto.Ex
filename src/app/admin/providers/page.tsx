@@ -1,5 +1,7 @@
-import { ComingSoonPage } from "@/shell/coming-soon-page";
+import { adminListProviders } from "@/domains/providers/admin-queries";
+import { ProvidersView } from "./providers-view";
 
-export default function Page() {
-  return <ComingSoonPage titleKey="nav.admin.providers" />;
+export default async function AdminProvidersPage() {
+  const providers = await adminListProviders();
+  return <ProvidersView providers={providers} />;
 }
