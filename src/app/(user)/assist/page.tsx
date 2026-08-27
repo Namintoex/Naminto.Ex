@@ -1,5 +1,12 @@
-import { ComingSoonPage } from "@/shell/coming-soon-page";
+import { redirect } from "next/navigation";
+import { getCurrentUser } from "@/domains/identity/queries";
+import { AssistView } from "./assist-view";
 
-export default function Page() {
-  return <ComingSoonPage titleKey="nav.assist" />;
+export default async function AssistPage() {
+  const user = await getCurrentUser();
+  if (!user) {
+    redirect("/login");
+  }
+
+  return <AssistView />;
 }

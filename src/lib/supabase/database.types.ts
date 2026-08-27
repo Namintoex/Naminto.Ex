@@ -33,6 +33,8 @@ export type NotificationChannel = "IN_APP" | "PUSH" | "SMS";
 export type NotificationDeliveryStatus = "PENDING" | "SENT" | "FAILED";
 /** Même distinction que ProviderMode (providers/types.ts) — jamais REAL tant qu'aucun fournisseur SMS/PUSH réel n'est connecté. */
 export type ChannelMode = "REAL" | "SANDBOX" | "MOCK" | "UNAVAILABLE";
+export type TicketCategory = "transaction_issue" | "fees" | "account" | "other";
+export type TicketStatus = "open" | "in_progress" | "resolved" | "closed";
 
 export interface Database {
   public: {
@@ -541,6 +543,32 @@ export interface Database {
           attempts: number;
           last_error: string | null;
           sent_at: string | null;
+        }>;
+        Relationships: [];
+      };
+      support_tickets: {
+        Row: {
+          id: string;
+          user_id: string;
+          subject: string;
+          description: string;
+          category: TicketCategory;
+          related_transaction_id: string | null;
+          status: TicketStatus;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          subject: string;
+          description: string;
+          category?: TicketCategory;
+          related_transaction_id?: string | null;
+          status?: TicketStatus;
+        };
+        Update: Partial<{
+          status: TicketStatus;
         }>;
         Relationships: [];
       };
