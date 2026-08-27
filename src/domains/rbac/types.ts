@@ -47,6 +47,8 @@ export const PERMISSIONS = [
   "notification.manage",
   "audit.read",
   "role.manage",
+  "reconciliation.read",
+  "reconciliation.manage",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -65,7 +67,15 @@ export const ROLE_PERMISSIONS: Record<AdminRole, Permission[]> = {
   kyc: ["dashboard.read", "user.read", "kyc.read", "kyc.review"],
   compliance: ["dashboard.read", "user.read", "kyc.read", "transaction.read", "pricing.read", "audit.read"],
   risk: ["dashboard.read", "transaction.read", "risk.read", "fraud.read"],
-  finance: ["dashboard.read", "ledger.read", "pricing.read", "pricing.manage", "transaction.read"],
+  finance: [
+    "dashboard.read",
+    "ledger.read",
+    "pricing.read",
+    "pricing.manage",
+    "transaction.read",
+    "reconciliation.read",
+    "reconciliation.manage",
+  ],
   operations: ["dashboard.read", "provider.read", "provider.manage", "notification.read", "notification.manage"],
   security: ["dashboard.read", "user.read", "user.suspend", "audit.read", "transaction.read"],
   legal: ["dashboard.read", "legal.manage", "faq.manage", "country.manage"],

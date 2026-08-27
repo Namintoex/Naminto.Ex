@@ -214,7 +214,11 @@ export async function runPaymentOrchestrator(request: PaymentRequest): Promise<O
         err
       );
     }
-    await scheduleReconciliation(transaction.id);
+    try {
+      await scheduleReconciliation(transaction.id);
+    } catch (err) {
+      console.error("[orchestrator] scheduleReconciliation a échoué après règlement — transaction non affectée", err);
+    }
 
     return { transaction, replayed: false };
   } catch (err) {

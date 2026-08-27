@@ -67,7 +67,12 @@ export const adminNavItems: NavItem[] = [
   { href: "/admin/ledger", labelKey: "nav.admin.ledger", icon: BookOpen, primary: true, permission: "ledger.read" },
   { href: "/admin/kyc", labelKey: "nav.admin.kyc", icon: BadgeCheck, permission: "kyc.read" },
   { href: "/admin/providers", labelKey: "nav.admin.providers", icon: Plug, permission: "provider.read" },
-  { href: "/admin/reconciliation", labelKey: "nav.admin.reconciliation", icon: GitCompare },
+  {
+    href: "/admin/reconciliation",
+    labelKey: "nav.admin.reconciliation",
+    icon: GitCompare,
+    permission: "reconciliation.read",
+  },
   { href: "/admin/risk", labelKey: "nav.admin.risk", icon: AlertTriangle, permission: "risk.read" },
   { href: "/admin/fraud", labelKey: "nav.admin.fraud", icon: ShieldAlert, permission: "fraud.read" },
   { href: "/admin/support", labelKey: "nav.admin.support", icon: LifeBuoy, permission: "support.read" },

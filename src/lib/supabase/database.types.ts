@@ -36,6 +36,13 @@ export type ChannelMode = "REAL" | "SANDBOX" | "MOCK" | "UNAVAILABLE";
 export type TicketCategory = "transaction_issue" | "fees" | "account" | "other";
 export type TicketStatus = "open" | "in_progress" | "resolved" | "closed";
 export type LegalDocumentType = "terms" | "privacy" | "pricing_disclosure" | "other";
+export type ReconciliationAnomalyType =
+  | "missing"
+  | "duplicate"
+  | "amount_mismatch"
+  | "status_mismatch"
+  | "settlement_mismatch";
+export type ReconciliationAnomalyStatus = "open" | "investigating" | "resolved" | "closed";
 export type AdminRole =
   | "support"
   | "kyc"
@@ -683,6 +690,31 @@ export interface Database {
           role: AdminRole;
         };
         Update: never;
+        Relationships: [];
+      };
+      reconciliation_anomalies: {
+        Row: {
+          id: string;
+          transaction_id: string;
+          type: ReconciliationAnomalyType;
+          status: ReconciliationAnomalyStatus;
+          details: Record<string, unknown>;
+          note: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          transaction_id: string;
+          type: ReconciliationAnomalyType;
+          status?: ReconciliationAnomalyStatus;
+          details?: Record<string, unknown>;
+          note?: string | null;
+        };
+        Update: Partial<{
+          status: ReconciliationAnomalyStatus;
+          note: string | null;
+        }>;
         Relationships: [];
       };
     };
