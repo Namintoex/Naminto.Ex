@@ -62,8 +62,12 @@ export async function adminCreateCountry(input: AdminCreateCountryInput): Promis
 
 export async function adminSetCountryActive(id: string, active: boolean): Promise<AdminActionResult> {
   const admin = createAdminClient();
-  const { error } = await admin.from("countries").update({ active }).eq("id", id);
+  const { data, error } = await admin.from("countries").update({ active }).eq("id", id).select("id").maybeSingle();
   if (error) return { ok: false, error: "admin.countries.error.updateFailed" };
+  // Un id inexistant/périmé (revue de code) ne doit jamais "réussir"
+  // silencieusement — Supabase ne renvoie aucune erreur pour un UPDATE qui
+  // ne touche aucune ligne.
+  if (!data) return { ok: false, error: "admin.countries.error.updateFailed" };
 
   return { ok: true };
 }

@@ -12,10 +12,20 @@ type Transaction = Database["public"]["Tables"]["transactions"]["Row"];
  * exact où la contrainte s'applique (« une panne SMS ne doit jamais
  * annuler une transaction financière déjà confirmée »).
  */
-export async function notifyTransactionSettled(transaction: Transaction): Promise<void> {
+/**
+ * `skipUserIds` (revue de code) : un règlement portefeuille-à-portefeuille
+ * notifie DEUX destinataires indépendants (expéditeur et destinataire).
+ * Le consumer d'événement (Prompt 26) ne peut garantir l'idempotence
+ * qu'au grain de chaque destinataire, pas au grain de l'événement entier
+ * — sans ce paramètre, un retry après une interruption entre les deux
+ * envois (fonction tuée, timeout) retrouvait la notification de
+ * l'expéditeur déjà écrite et sautait tout le traitement, y compris
+ * l'envoi — jamais rejoué — au destinataire.
+ */
+export async function notifyTransactionSettled(transaction: Transaction, skipUserIds: ReadonlySet<string> = new Set()): Promise<void> {
   const notifications: Promise<unknown>[] = [];
 
-  if (transaction.sender_user_id) {
+  if (transaction.sender_user_id && !skipUserIds.has(transaction.sender_user_id)) {
     notifications.push(
       sendNotification({
         type: "transaction_settled",
@@ -30,7 +40,11 @@ export async function notifyTransactionSettled(transaction: Transaction): Promis
     );
   }
 
-  if (transaction.destination_type === "naminto_wallet" && transaction.recipient_user_id) {
+  if (
+    transaction.destination_type === "naminto_wallet" &&
+    transaction.recipient_user_id &&
+    !skipUserIds.has(transaction.recipient_user_id)
+  ) {
     notifications.push(
       sendNotification({
         type: "transaction_settled",

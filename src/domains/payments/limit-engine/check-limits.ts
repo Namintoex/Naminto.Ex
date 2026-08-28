@@ -28,7 +28,8 @@ export async function checkLimits(input: LimitCheckInput): Promise<LimitDecision
   }
   const resolvedInput: LimitCheckInput = { ...input, kycStatus };
 
-  const { data: rules, error } = await admin.from("limit_rules").select("*").eq("active", true);
+  // `.order("created_at")` : voir le même correctif dans fee-engine/calculate-fee.ts.
+  const { data: rules, error } = await admin.from("limit_rules").select("*").eq("active", true).order("created_at", { ascending: true });
   if (error) {
     throw new Error(`Limit Engine: lecture des règles échouée (${error.message})`);
   }
@@ -48,7 +49,7 @@ export async function checkLimits(input: LimitCheckInput): Promise<LimitDecision
 
   const dailyRule = pickRuleForType(rules ?? [], "daily_amount", resolvedInput);
   if (dailyRule && dailyRule.max_amount !== null) {
-    const used = await getAmountUsage(input.userId, input.currency, "day");
+    const used = await getAmountUsage(input.userId, input.currency, "day", dailyRule.provider);
     const projected = used + input.amount;
     if (projected > dailyRule.max_amount) {
       violations.push({
@@ -63,7 +64,7 @@ export async function checkLimits(input: LimitCheckInput): Promise<LimitDecision
 
   const monthlyRule = pickRuleForType(rules ?? [], "monthly_amount", resolvedInput);
   if (monthlyRule && monthlyRule.max_amount !== null) {
-    const used = await getAmountUsage(input.userId, input.currency, "month");
+    const used = await getAmountUsage(input.userId, input.currency, "month", monthlyRule.provider);
     const projected = used + input.amount;
     if (projected > monthlyRule.max_amount) {
       violations.push({
@@ -78,7 +79,7 @@ export async function checkLimits(input: LimitCheckInput): Promise<LimitDecision
 
   const frequencyRule = pickRuleForType(rules ?? [], "frequency_count", resolvedInput);
   if (frequencyRule && frequencyRule.max_count !== null && frequencyRule.period_hours !== null) {
-    const used = await getFrequencyUsage(input.userId, frequencyRule.period_hours);
+    const used = await getFrequencyUsage(input.userId, frequencyRule.period_hours, frequencyRule.provider);
     const projected = used + 1;
     if (projected > frequencyRule.max_count) {
       violations.push({

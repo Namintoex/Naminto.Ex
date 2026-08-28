@@ -30,6 +30,7 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
   const encoded = encodeQr({
     v: 1,
     type: "PAYMENT_REQUEST",
+    // eslint-disable-next-line react-hooks/purity -- Server Component (RSC) : voir la même justification dans (user)/receive/page.tsx.
     iat: Date.now(),
     exp: new Date(request.expires_at).getTime(),
     token: request.token,

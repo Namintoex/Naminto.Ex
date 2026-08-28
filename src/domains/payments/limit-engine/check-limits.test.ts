@@ -17,7 +17,7 @@ describe("Limit Engine — checkLimits (intégration)", () => {
   const createdRuleIds: string[] = [];
   const createdTransactionIds: string[] = [];
 
-  async function settledTransaction(amount: number) {
+  async function settledTransaction(amount: number, provider: "orange" | "mtn" | "moov" | "wave" | "prepaid_card" | null = null) {
     const tx = await createTransaction({
       senderUserId: userId,
       recipientUserId: null,
@@ -25,7 +25,7 @@ describe("Limit Engine — checkLimits (intégration)", () => {
       sourceReference: null,
       destinationType: "external",
       destinationReference: null,
-      provider: null,
+      provider,
       amount,
       currency: "XOF",
       idempotencyKey: `vitest-limits-${randomUUID()}`,
@@ -119,6 +119,44 @@ describe("Limit Engine — checkLimits (intégration)", () => {
     expect(wouldExceed.allowed).toBe(false);
     expect(wouldExceed.violations[0].limitType).toBe("daily_amount");
     expect(wouldExceed.violations[0].projectedUsage).toBe(110_000);
+  });
+
+  it("daily_amount spécifique à un fournisseur : l'usage n'est compté que sur CE fournisseur, pas tous confondus (revue de code)", async () => {
+    // Règle générique (aucun fournisseur) + règle plus stricte spécifique
+    // à "wave" — pickRuleForType retient la règle wave pour une requête
+    // avec provider: "wave" (plus spécifique). Bug trouvé en revue de
+    // code : getAmountUsage sommait TOUTES les transactions XOF du jour
+    // quel que soit le fournisseur, y compris celles via "orange", faisant
+    // percuter à tort la limite wave alors que l'usage réel sur wave est
+    // nul.
+    const generic = await admin
+      .from("limit_rules")
+      .insert({ limit_type: "daily_amount", max_amount: 5_000_000, currency: "XOF" })
+      .select("id")
+      .single();
+    createdRuleIds.push(generic.data!.id);
+    const waveSpecific = await admin
+      .from("limit_rules")
+      .insert({ limit_type: "daily_amount", max_amount: 100_000, currency: "XOF", provider: "wave" })
+      .select("id")
+      .single();
+    createdRuleIds.push(waveSpecific.data!.id);
+
+    // 4 000 000 XOF déjà envoyés aujourd'hui, mais via "orange" — ne doit
+    // jamais compter contre la limite wave (100 000).
+    await settledTransaction(4_000_000, "orange");
+
+    const wavePayment = await checkLimits({ userId, amount: 50_000, currency: "XOF", provider: "wave" });
+    expect(wavePayment.allowed).toBe(true);
+    if (!wavePayment.allowed) {
+      // Message d'échec explicite si jamais la régression revient.
+      expect(wavePayment.violations).toEqual([]);
+    }
+
+    // Le plafond générique (5 000 000, tous fournisseurs) reste, lui,
+    // bien basé sur l'usage réel tous fournisseurs confondus.
+    const genericPayment = await checkLimits({ userId, amount: 1_100_001, currency: "XOF", provider: "orange" });
+    expect(genericPayment.allowed).toBe(false);
   });
 
   it("frequency_count : refuse au-delà du nombre d'opérations autorisées sur la fenêtre", async () => {

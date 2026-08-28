@@ -7,7 +7,6 @@ import { useLocale } from "@/design-system/i18n/locale-provider";
 import type { CountryProfile } from "@/domains/countries/types";
 
 function TagList({ items }: { items: string[] }) {
-  const { t } = useLocale();
   if (items.length === 0) return <span className="text-sm text-text-secondary">—</span>;
   return (
     <div className="flex flex-wrap gap-1.5">

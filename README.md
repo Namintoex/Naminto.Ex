@@ -19,10 +19,10 @@ Next.js 16 (App Router) + TypeScript strict, npm, Supabase (backend/données).
 ```bash
 npm install
 cp .env.example .env.local   # renseigner les identifiants Supabase du projet Naminto.Ex
-npm run dev
+npm run dev -- -p 3010
 ```
 
-Ouvrir [http://localhost:3000](http://localhost:3000).
+Ouvrir [http://localhost:3010](http://localhost:3010). Port 3010 systématiquement, jamais 3000 — réservé à Naminto Académie, un projet totalement distinct (dépôt et Supabase séparés).
 
 ## Tests
 

@@ -91,6 +91,32 @@ describe("webhooks — processIncomingWebhook (intégration)", () => {
     expect(count).toBe(2); // les deux tentatives restent auditées, la seconde n'a rien retraité
   });
 
+  it("deux livraisons réellement concurrentes du même event_id : une seule processed, jamais deux (revue de code)", async () => {
+    const eventId = `evt-${randomUUID()}`;
+    const body = payload({ event_id: eventId });
+    const signature = signSandboxWebhook(body);
+
+    // Promise.all, pas deux appels successifs — le check-then-insert
+    // (findExistingProcessedEvent puis insertAuditRow) n'était pas
+    // atomique avant l'index unique partiel de la migration 0022 :
+    // sans lui, les deux appels pouvaient tous deux passer la
+    // vérification de duplication et produire deux lignes processed.
+    const [first, second] = await Promise.all([run(body, signature), run(body, signature)]);
+    const results = [first, second];
+
+    const processed = results.filter((r) => r.status === "processed");
+    const duplicate = results.filter((r) => r.status === "duplicate");
+    expect(processed).toHaveLength(1);
+    expect(duplicate).toHaveLength(1);
+
+    const { count } = await admin
+      .from("webhook_events")
+      .select("id", { count: "exact", head: true })
+      .eq("event_id", eventId)
+      .eq("status", "processed");
+    expect(count).toBe(1);
+  });
+
   it("détecte un événement hors ordre pour la même transaction fournisseur", async () => {
     const providerTransactionId = `orange_${randomUUID()}`;
     const first = payload({

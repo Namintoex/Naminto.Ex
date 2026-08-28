@@ -241,6 +241,22 @@ export async function createPinAction(
     .eq("user_id", user.id)
     .maybeSingle();
 
+  // Un PIN déjà défini ne peut être remplacé qu'en prouvant la
+  // connaissance du PIN actuel (revue de code — sans cette vérification,
+  // une session volée/hébergée par un XSS pouvait installer un nouveau
+  // PIN de son choix puis l'utiliser immédiatement pour autoriser un
+  // paiement, sans jamais connaître le vrai PIN de la victime). Réutilise
+  // `verifyPinForUser` — même verrouillage anti-brute-force que
+  // `verifyPinAction`, jamais une seconde surface de tentative parallèle.
+  if (existing) {
+    const currentPin = String(formData.get("currentPin") ?? "");
+    const verification = await verifyPinForUser(user.id, currentPin);
+    if (!verification.ok) {
+      if (verification.reason === "locked") return { error: "pin.error.locked" };
+      return { error: "pin.error.invalid" };
+    }
+  }
+
   const pinHash = await hashPin(pin);
 
   if (existing) {

@@ -5,7 +5,7 @@ import { CheckCircle2 } from "lucide-react";
 import { Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Input } from "@/design-system";
 import { useLocale } from "@/design-system/i18n/locale-provider";
 import { payMoneyRequestAction } from "@/domains/payments/money-requests/actions";
-import { effectiveStatus, type MoneyRequestRow, type MoneyRequestStatus } from "@/domains/payments/money-requests/types";
+import { effectiveStatus, type PublicMoneyRequestView, type MoneyRequestStatus } from "@/domains/payments/money-requests/types";
 
 function statusVariant(status: MoneyRequestStatus) {
   if (status === "fulfilled") return "success" as const;
@@ -19,7 +19,7 @@ export function PayView({
   requesterName,
   isSelf,
 }: {
-  request: MoneyRequestRow;
+  request: PublicMoneyRequestView;
   requesterName: string;
   isSelf: boolean;
 }) {

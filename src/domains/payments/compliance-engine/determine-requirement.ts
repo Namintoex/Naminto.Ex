@@ -12,7 +12,8 @@ import type { ComplianceCheckInput, ComplianceDecision } from "./types";
  */
 export async function determineRequirement(input: ComplianceCheckInput): Promise<ComplianceDecision> {
   const admin = createAdminClient();
-  const { data, error } = await admin.from("compliance_rules").select("*").eq("active", true);
+  // `.order("created_at")` : voir le même correctif dans fee-engine/calculate-fee.ts.
+  const { data, error } = await admin.from("compliance_rules").select("*").eq("active", true).order("created_at", { ascending: true });
 
   if (error) {
     throw new Error(`Compliance Engine: lecture des règles échouée (${error.message})`);

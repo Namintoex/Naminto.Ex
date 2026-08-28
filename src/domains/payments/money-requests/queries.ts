@@ -20,9 +20,15 @@ export async function listOwnMoneyRequests(userId: string): Promise<MoneyRequest
 
 /**
  * Résout une demande par son jeton — utilisé par la page publique du
- * lien de partage (`/pay/[token]`). Passe par service_role : la table
- * n'a aucune policy RLS de lecture par jeton (voir 0010_money_requests.sql)
- * pour ne jamais exposer money_requests à l'énumération côté client.
+ * lien de partage (`/pay/[token]`, qui doit lire `requester_user_id` pour
+ * résoudre le nom du demandeur et calculer `isSelf` côté serveur) et par
+ * `fulfill.ts`. Passe par service_role : la table n'a aucune policy RLS de
+ * lecture par jeton (voir 0010_money_requests.sql) pour ne jamais exposer
+ * money_requests à l'énumération côté client. Ne jamais passer ce résultat
+ * tel quel à un composant `"use client"` (sérialiserait
+ * `requester_user_id`/`claimed_by_user_id`/`fulfilled_transaction_id`/`id`
+ * dans le payload RSC) — ne transmettre qu'un `PublicMoneyRequestView`
+ * explicitement restreint, comme fait `/pay/[token]/page.tsx`.
  */
 export async function getMoneyRequestByToken(token: string): Promise<MoneyRequestRow | null> {
   const admin = createAdminClient();

@@ -16,6 +16,7 @@ export default async function ReceivePage() {
     redirect("/login");
   }
 
+  // eslint-disable-next-line react-hooks/purity -- Server Component (RSC) : ce corps de fonction s'exécute une seule fois par requête serveur, jamais rejoué/mémoïsé par React contrairement à un Client Component ; Date.now() y est sans danger (comme cookies()/headers() ailleurs dans ce dépôt).
   const now = Date.now();
   const encoded = encodeQr({
     v: 1,

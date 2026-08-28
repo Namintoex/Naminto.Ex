@@ -7,8 +7,14 @@ import type { CountryProfile } from "./types";
  * providers, rails, languages, privacy déjà sur `countries` ;
  * pricing/limits/kyc-aml/legalRules agrégés depuis les moteurs de
  * règles déjà en place (Prompts 10/11/19/22), jamais recalculés ni
- * dupliqués. `legalRules` inclut les documents génériques (`country`
- * NULL, s'appliquent à tous les pays) en plus de ceux propres à ce pays.
+ * dupliqués. `country` NULL sur une règle est un joker qui s'applique à
+ * tous les pays (voir `ruleMatches` de chaque moteur — fee-engine,
+ * limit-engine, compliance-engine) : `pricing`/`limits`/`kycAml` incluent
+ * donc les règles génériques en plus de celles propres à ce pays, comme
+ * `legalRules` le fait déjà — sans quoi un pays reposant sur le repli XOF
+ * générique (aucune règle `country`-spécifique saisie) apparaîtrait à tort
+ * comme n'ayant aucune tarification/limite/exigence KYC configurée (bug
+ * trouvé en revue de code).
  */
 export async function getCountryProfile(code: string): Promise<CountryProfile | null> {
   const admin = createAdminClient();
@@ -17,11 +23,12 @@ export async function getCountryProfile(code: string): Promise<CountryProfile | 
   const { data: country } = await admin.from("countries").select("*").eq("code", normalized).maybeSingle();
   if (!country) return null;
 
+  const countryOrGlobal = `country.eq.${normalized},country.is.null`;
   const [{ data: pricing }, { data: limits }, { data: kycAml }, { data: legalRules }] = await Promise.all([
-    admin.from("fee_rules").select("*").eq("country", normalized).eq("active", true),
-    admin.from("limit_rules").select("*").eq("country", normalized).eq("active", true),
-    admin.from("compliance_rules").select("*").eq("country", normalized).eq("active", true),
-    admin.from("legal_documents").select("*").or(`country.eq.${normalized},country.is.null`).eq("published", true),
+    admin.from("fee_rules").select("*").or(countryOrGlobal).eq("active", true),
+    admin.from("limit_rules").select("*").or(countryOrGlobal).eq("active", true),
+    admin.from("compliance_rules").select("*").or(countryOrGlobal).eq("active", true),
+    admin.from("legal_documents").select("*").or(countryOrGlobal).eq("published", true),
   ]);
 
   return {

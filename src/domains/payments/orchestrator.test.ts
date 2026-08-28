@@ -245,6 +245,43 @@ describe("Payment Orchestrator (intégration)", () => {
     expect(tx?.status).toBe("cancelled");
   });
 
+  it("rejouer la même idempotencyKey après un échec terminal (AUTH_ERROR) ne renvoie jamais un faux succès", async () => {
+    const idempotencyKey = `vitest-orch-${randomUUID()}`;
+    const failedAttempt = baseRequest({ pin: "000000", idempotencyKey });
+
+    let firstError: unknown;
+    try {
+      await runPaymentOrchestrator(failedAttempt);
+    } catch (err) {
+      firstError = err;
+    }
+    expect((firstError as OrchestratorError).code).toBe("AUTH_ERROR");
+
+    const { data: tx } = await admin
+      .from("transactions")
+      .select("id, status")
+      .eq("idempotency_key", idempotencyKey)
+      .single();
+    if (tx) createdTransactionIds.push(tx.id);
+    expect(tx?.status).toBe("cancelled");
+
+    // Rejeu avec la MÊME idempotencyKey, cette fois avec le bon PIN — ne
+    // doit jamais silencieusement renvoyer `replayed: true` (un succès
+    // mensonger pour une tentative dont le PIN précédent était faux et
+    // dont aucun transfert n'a jamais réellement eu lieu). Corrige un bug
+    // trouvé en revue de code : `!isInFlight(status)` seul est vrai pour
+    // tout statut terminal, y compris un échec.
+    let secondError: unknown;
+    try {
+      await runPaymentOrchestrator(baseRequest({ idempotencyKey }));
+    } catch (err) {
+      secondError = err;
+    }
+    expect(secondError).toBeInstanceOf(OrchestratorError);
+    expect((secondError as OrchestratorError).code).toBe("SYSTEM_ERROR");
+    expect((secondError as OrchestratorError).details?.status).toBe("cancelled");
+  });
+
   it("RISK_REJECTION : montant au-delà du seuil HIGH du Risk Engine, la transaction se termine en failed", async () => {
     const request = baseRequest({ amount: 500_001 });
 
@@ -364,7 +401,15 @@ describe("Payment Orchestrator (intégration)", () => {
       .single();
     if (tx) createdTransactionIds.push(tx.id);
     expect(tx?.status).toBe("failed");
-  });
+    // 60s : ce test enchaîne deux règlements orchestrateur complets (le
+    // premier RÉELLEMENT settled — Ledger, notification, réconciliation
+    // inclus) contre le vrai projet Supabase ; déjà marginal sur son
+    // budget de 30s par défaut avant ce prompt (même nature que
+    // FRAUD_BLOCKED, voir le commentaire de ce test), et les correctifs
+    // de cette revue de code (withTimeout, filtre provider du Limit
+    // Engine, idempotence par destinataire des notifications) ajoutent
+    // chacun un aller-retour réseau supplémentaire.
+  }, 60_000);
 
   it("MANUAL_REVIEW_REQUIRED : plusieurs signaux de risque modérés combinés (Fraud Engine, Prompt 18)", async () => {
     // Utilisateur dédié : le montant ciblé (150 000, nouveau bénéficiaire,

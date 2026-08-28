@@ -233,4 +233,35 @@ describe("Money Requests (intégration)", () => {
     expect(updatedRequest?.claimed_by_user_id).toBe(transaction?.sender_user_id);
     expect(updatedRequest?.fulfilled_transaction_id).toBe(fulfilled[0].value.transactionId);
   }, 60_000);
+
+  it("annulation et règlement concurrents : jamais un statut cancelled qui écrase un vrai transfert réglé (revue de code)", async () => {
+    const request = await createMoneyRequest({ requesterUserId: requesterId, amount: 1_800 });
+    createdRequestIds.push(request.id);
+
+    const [cancelResult, fulfillResult] = await Promise.allSettled([
+      cancelMoneyRequest(request.id, requesterId),
+      fulfillMoneyRequest({ token: request.token, payerUserId: payerId, pin }),
+    ]);
+
+    const { data: finalRequest } = await admin
+      .from("money_requests")
+      .select("status, fulfilled_transaction_id")
+      .eq("id", request.id)
+      .single();
+
+    if (fulfillResult.status === "fulfilled") {
+      createdTransactionIds.push(fulfillResult.value.transactionId);
+      // Le règlement a gagné : le statut final doit être fulfilled avec la
+      // bonne transaction — jamais cancelled alors qu'un vrai transfert a
+      // eu lieu (c'était le bug : l'UPDATE de cancelMoneyRequest n'était
+      // conditionnée que par l'id, jamais par status='pending').
+      expect(finalRequest?.status).toBe("fulfilled");
+      expect(finalRequest?.fulfilled_transaction_id).toBe(fulfillResult.value.transactionId);
+      expect(cancelResult.status).toBe("rejected");
+    } else {
+      // L'annulation a gagné : aucun transfert n'a dû avoir lieu.
+      expect(finalRequest?.status).toBe("cancelled");
+      expect(finalRequest?.fulfilled_transaction_id).toBeNull();
+    }
+  }, 30_000);
 });

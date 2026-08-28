@@ -4,6 +4,18 @@ export type { MoneyRequestStatus };
 export type MoneyRequestRow = Database["public"]["Tables"]["money_requests"]["Row"];
 
 /**
+ * Forme minimale exposée à la page publique `/pay/[token]` (revue de
+ * code) — jamais `requester_user_id`/`claimed_by_user_id`/
+ * `fulfilled_transaction_id`/`id` : `MoneyRequestRow` complet passé tel
+ * quel en prop à un composant client sérialise tout dans le payload RSC
+ * envoyé au navigateur, y compris à un visiteur qui n'est pas le payeur
+ * prévu (le lien n'est protégé que par la session Naminto.Ex, pas par
+ * l'identité). Même principe déjà appliqué à `AdminTransactionSummary`
+ * (Prompt 28, ADR-056).
+ */
+export type PublicMoneyRequestView = Pick<MoneyRequestRow, "token" | "amount" | "currency" | "note" | "status" | "expires_at">;
+
+/**
  * Durée de vie par défaut d'une demande d'argent — non documentée dans
  * les sources du projet (Prompt 14 exige seulement qu'un identifiant
  * « expirant » existe). Valeur raisonnable choisie par implémentation ;

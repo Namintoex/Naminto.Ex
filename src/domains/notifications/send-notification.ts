@@ -107,21 +107,36 @@ async function dispatchChannel(
   return attemptDelivery(admin, delivery.id, adapter, payload);
 }
 
+/**
+ * `priorAttempts` (revue de code) : un retry (`retryDelivery` ci-dessous)
+ * repartait toujours de 0, écrasant le total réel de tentatives déjà
+ * effectuées dans `notification_deliveries.attempts` — un admin
+ * relançant plusieurs fois une livraison définitivement `FAILED` pouvait
+ * ainsi déclencher un nombre illimité d'envois réels, sans jamais que le
+ * budget `MAX_ATTEMPTS` ne s'applique de façon cumulative. Même principe
+ * déjà appliqué à `retryDeliveryNow` côté Event Bus (`dispatch.ts`).
+ */
 async function attemptDelivery(
   admin: AdminClient,
   deliveryId: string,
   adapter: ChannelAdapter,
-  payload: { title: string; body: string; phoneNumber: string | null }
+  payload: { title: string; body: string; phoneNumber: string | null },
+  priorAttempts = 0
 ): Promise<DeliveryOutcome> {
   // UNAVAILABLE (ex. PUSH) échoue toujours de la même façon : retenter
   // n'y changerait rien, contrairement à une panne transitoire d'un
   // canal réellement connecté (REAL/SANDBOX/MOCK).
   const maxAttempts = adapter.mode === "UNAVAILABLE" ? 1 : MAX_ATTEMPTS;
+  // Toujours au moins une tentative par appel, même si priorAttempts a
+  // déjà atteint maxAttempts (retry manuel d'une livraison FAILED) — un
+  // admin qui relance une livraison épuisée doit obtenir une tentative
+  // supplémentaire réelle, jamais un retour silencieux sans rien tenter.
+  const attemptsThisCall = Math.max(1, maxAttempts - priorAttempts);
 
-  let attempts = 0;
+  let attempts = priorAttempts;
   let lastError: string | undefined;
 
-  while (attempts < maxAttempts) {
+  for (let i = 0; i < attemptsThisCall; i++) {
     attempts += 1;
     const result = await safeSend(adapter, payload);
     if (result.success) {
@@ -186,11 +201,17 @@ export async function retryDelivery(deliveryId: string): Promise<DeliveryOutcome
       .maybeSingle();
 
     const adapter = getChannelAdapter(delivery.channel);
-    return attemptDelivery(admin, deliveryId, adapter, {
-      title: notification.title,
-      body: notification.body,
-      phoneNumber: profile?.phone_verified ? profile.phone_number : null,
-    });
+    return attemptDelivery(
+      admin,
+      deliveryId,
+      adapter,
+      {
+        title: notification.title,
+        body: notification.body,
+        phoneNumber: profile?.phone_verified ? profile.phone_number : null,
+      },
+      delivery.attempts
+    );
   } catch (err) {
     console.error("[notifications] retryDelivery a échoué de façon inattendue", err);
     return null;

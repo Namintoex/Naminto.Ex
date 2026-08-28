@@ -52,12 +52,31 @@ describe("getCountryProfile / listActiveCurrencies (intégration)", () => {
       .single();
     feeRuleIds.push(feeRule!.id);
 
+    // Règle générique (country: null) — doit apparaître dans CE profil
+    // ET dans celui de n'importe quel autre pays (joker, comme
+    // `ruleMatches` de chaque moteur le traite déjà). Bug trouvé en revue
+    // de code : pricing/limits/kycAml ignoraient ces règles génériques,
+    // contrairement à legalRules qui les gérait déjà correctement.
+    const { data: globalFeeRule } = await admin
+      .from("fee_rules")
+      .insert({ country: null, rate_percent: 9.9, flat_fee: 9, fee_payer: "sender" })
+      .select("id")
+      .single();
+    feeRuleIds.push(globalFeeRule!.id);
+
     const { data: limitRule } = await admin
       .from("limit_rules")
       .insert({ country: code, limit_type: "daily_amount", max_amount: 500_000 })
       .select("id")
       .single();
     limitRuleIds.push(limitRule!.id);
+
+    const { data: globalLimitRule } = await admin
+      .from("limit_rules")
+      .insert({ country: null, limit_type: "frequency_count", max_count: 999, period_hours: 24 })
+      .select("id")
+      .single();
+    limitRuleIds.push(globalLimitRule!.id);
 
     const { data: complianceRule } = await admin
       .from("compliance_rules")
@@ -70,6 +89,18 @@ describe("getCountryProfile / listActiveCurrencies (intégration)", () => {
       .select("id")
       .single();
     complianceRuleIds.push(complianceRule!.id);
+
+    const { data: globalComplianceRule } = await admin
+      .from("compliance_rules")
+      .insert({
+        country: null,
+        rule_type: "REGULATORY_RULE",
+        requirement: "KYC_STANDARD",
+        description: "Règle générique de test.",
+      })
+      .select("id")
+      .single();
+    complianceRuleIds.push(globalComplianceRule!.id);
 
     const { data: countrySpecificDoc } = await admin
       .from("legal_documents")
@@ -123,9 +154,13 @@ describe("getCountryProfile / listActiveCurrencies (intégration)", () => {
     expect(profile!.rails).toEqual(["mobile_money"]);
     expect(profile!.privacyNotes).toBe("Notes de confidentialité de test.");
 
-    expect(profile!.pricing.map((r) => r.id)).toEqual([feeRule!.id]);
-    expect(profile!.limits.map((r) => r.id)).toEqual([limitRule!.id]);
-    expect(profile!.kycAml.map((r) => r.id)).toEqual([complianceRule!.id]);
+    // Chaque liste contient à la fois la règle spécifique à ce pays ET la
+    // règle générique (country: null, joker) — jamais l'une sans l'autre.
+    expect(profile!.pricing.map((r) => r.id)).toEqual(expect.arrayContaining([feeRule!.id, globalFeeRule!.id]));
+    expect(profile!.limits.map((r) => r.id)).toEqual(expect.arrayContaining([limitRule!.id, globalLimitRule!.id]));
+    expect(profile!.kycAml.map((r) => r.id)).toEqual(
+      expect.arrayContaining([complianceRule!.id, globalComplianceRule!.id])
+    );
 
     const legalIds = profile!.legalRules.map((d) => d.id);
     expect(legalIds).toContain(countrySpecificDoc!.id);

@@ -55,7 +55,14 @@ async function insertAuditRow(
     })
     .select("id")
     .single();
-  if (error || !data) throw new Error(`webhook_events insert échoué: ${error?.message ?? "unknown error"}`);
+  if (error || !data) {
+    const insertError = new Error(`webhook_events insert échoué: ${error?.message ?? "unknown error"}`);
+    // Préserve le code Postgres (ex. 23505) sur l'erreur relancée — sans
+    // quoi un appelant ne peut jamais distinguer une violation de
+    // contrainte unique (course concurrente légitime) d'une vraie panne.
+    if (error?.code) (insertError as Error & { code?: string }).code = error.code;
+    throw insertError;
+  }
   return data.id;
 }
 
@@ -157,17 +164,43 @@ export async function processIncomingWebhook(
   }
 
   const transactionId = await resolveTransactionId(admin, provider, event.providerTransactionId ?? null);
-  const rowId = await insertAuditRow(admin, {
-    provider,
-    eventId: event.eventId,
-    eventType: event.type,
-    providerTransactionId: event.providerTransactionId ?? null,
-    transactionId,
-    occurredAt: event.occurredAt,
-    signatureValid: true,
-    status: "processed",
-    rejectReason: null,
-    payload: event.raw as Record<string, unknown>,
-  });
-  return { httpStatus: 200, status: "processed", eventRowId: rowId };
+  // Deux livraisons vraiment concurrentes du même event_id peuvent toutes
+  // deux dépasser la vérification `findExistingProcessedEvent` ci-dessus
+  // (SELECT puis INSERT non atomiques) — l'index unique partiel
+  // `webhook_events_processed_original_unique_idx` (migration 0022) est
+  // le véritable garde-fou : le perdant de la course reçoit une violation
+  // 23505, traitée ici comme un duplicate légitime plutôt qu'une erreur
+  // 500, jamais un deuxième traitement réel.
+  try {
+    const rowId = await insertAuditRow(admin, {
+      provider,
+      eventId: event.eventId,
+      eventType: event.type,
+      providerTransactionId: event.providerTransactionId ?? null,
+      transactionId,
+      occurredAt: event.occurredAt,
+      signatureValid: true,
+      status: "processed",
+      rejectReason: null,
+      payload: event.raw as Record<string, unknown>,
+    });
+    return { httpStatus: 200, status: "processed", eventRowId: rowId };
+  } catch (err) {
+    if ((err as { code?: string }).code === "23505") {
+      const rowId = await insertAuditRow(admin, {
+        provider,
+        eventId: event.eventId,
+        eventType: event.type,
+        providerTransactionId: event.providerTransactionId ?? null,
+        transactionId: null,
+        occurredAt: event.occurredAt,
+        signatureValid: true,
+        status: "duplicate",
+        rejectReason: null,
+        payload: event.raw as Record<string, unknown>,
+      });
+      return { httpStatus: 200, status: "duplicate", eventRowId: rowId };
+    }
+    throw err;
+  }
 }

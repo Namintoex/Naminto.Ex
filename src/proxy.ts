@@ -66,9 +66,14 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 
-  // TODO_DECISION : /admin est protégé par authentification uniquement pour
-  // l'instant (pas encore de vérification de rôle) — RBAC prévu au Prompt 23.
-  // Voir docs/DECISIONS.md.
+  // /admin n'est protégé ici que par l'authentification (session valide) —
+  // le contrôle de permission RBAC (Prompt 23) est vérifié plus finement
+  // par `requirePermission`/`checkPermission` dans chaque page et chaque
+  // Server Action sous `src/app/admin/(protected)/`, jamais ici : ce
+  // middleware n'a pas accès aux permissions résolues sans requête base
+  // supplémentaire à chaque navigation. Ne pas ajouter de route sous
+  // `/admin` hors du groupe `(protected)` sans sa propre vérification
+  // explicite de permission.
 
   return supabaseResponse;
 }

@@ -15,7 +15,13 @@ function round2(value: number): number {
  */
 export async function calculateFee(input: FeeCalculationInput): Promise<FeeCalculationResult> {
   const admin = createAdminClient();
-  const { data: rules, error } = await admin.from("fee_rules").select("*").eq("active", true);
+  // `.order("created_at")` (revue de code) : sans ordre explicite,
+  // PostgREST/Postgres ne garantit aucun ordre de ligne — le
+  // départage à égalité de spécificité de `pickMostSpecific` (« la
+  // première du tableau l'emporte ») dépendait alors de l'ordre
+  // physique en base, pas d'un critère prévisible. La plus ancienne
+  // règle à égalité l'emporte désormais, de façon stable et auditable.
+  const { data: rules, error } = await admin.from("fee_rules").select("*").eq("active", true).order("created_at", { ascending: true });
 
   if (error) {
     throw new Error(`Fee Engine: lecture des règles échouée (${error.message})`);

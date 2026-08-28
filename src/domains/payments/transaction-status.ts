@@ -107,3 +107,20 @@ const IN_FLIGHT_STATUSES: TransactionStatus[] = [
 export function isInFlight(status: TransactionStatus): boolean {
   return IN_FLIGHT_STATUSES.includes(status);
 }
+
+const SUCCESSFUL_TERMINAL_STATUSES: TransactionStatus[] = ["settled", "reversed", "refunded", "disputed"];
+
+/**
+ * `!isInFlight(status)` seul ne suffit pas à décider qu'un rejeu peut
+ * renvoyer `replayed: true` : il est vrai aussi bien pour `settled` que
+ * pour `failed`/`rejected`/`expired`/`cancelled` — un échec terminal n'est
+ * pas « en vol » non plus. Utilisé par le Payment Orchestrator pour ne
+ * jamais renvoyer un succès (`replayed: true`) pour une clé d'idempotence
+ * dont la tentative précédente s'est en réalité terminée en échec (revue
+ * de code, Prompt 30bis — un rejeu avec un PIN corrigé après un premier
+ * échec `AUTH_ERROR` renvoyait silencieusement l'ancien échec comme un
+ * succès).
+ */
+export function isSuccessfulTerminalStatus(status: TransactionStatus): boolean {
+  return SUCCESSFUL_TERMINAL_STATUSES.includes(status);
+}

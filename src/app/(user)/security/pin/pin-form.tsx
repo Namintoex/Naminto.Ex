@@ -21,6 +21,18 @@ export function PinForm({ welcome }: { welcome: boolean }) {
       <CardContent className="flex flex-col gap-4 pt-1">
         {state && "error" in state && <Alert variant="danger">{t(state.error)}</Alert>}
         <form action={formAction} className="flex flex-col gap-4">
+          {!welcome && (
+            <Input
+              type="password"
+              inputMode="numeric"
+              name="currentPin"
+              label={t("pin.labelCurrent")}
+              required
+              pattern="\d{6}"
+              maxLength={6}
+              autoComplete="off"
+            />
+          )}
           <Input
             type="password"
             inputMode="numeric"

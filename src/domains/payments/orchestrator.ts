@@ -1,6 +1,6 @@
 import "server-only";
 import { createTransaction, transitionTransaction } from "./transactions";
-import { isInFlight, type TransactionStatus } from "./transaction-status";
+import { isInFlight, isSuccessfulTerminalStatus, type TransactionStatus } from "./transaction-status";
 import { OrchestratorError, type OrchestratorErrorCode } from "./orchestrator-errors";
 import { validateRequest } from "./orchestrator-steps/validate";
 import { authenticateRequest } from "./orchestrator-steps/authenticate";
@@ -164,7 +164,22 @@ async function runPaymentOrchestratorInner(request: PaymentRequest): Promise<Orc
   }
 
   if (!isInFlight(transaction.status)) {
-    return { transaction, replayed: true };
+    if (isSuccessfulTerminalStatus(transaction.status)) {
+      return { transaction, replayed: true };
+    }
+    // `transaction.status` est un échec terminal (failed/rejected/expired/
+    // cancelled) : la tentative précédente pour cette idempotencyKey a
+    // réellement échoué, jamais réussi. Revue de code, corrige un bug où
+    // `!isInFlight` seul (vrai pour tout statut terminal, succès ou échec)
+    // faisait renvoyer `replayed: true` — un succès silencieux mensonger —
+    // y compris quand l'appelant rejouait avec des entrées corrigées (ex.
+    // bon PIN après un premier AUTH_ERROR). Une nouvelle idempotencyKey
+    // est nécessaire pour retenter réellement l'opération.
+    throw new OrchestratorError(
+      "SYSTEM_ERROR",
+      `Cette clé d'idempotence correspond à une tentative déjà terminée en échec (statut : ${transaction.status}) — une nouvelle idempotencyKey est requise pour réessayer.`,
+      { transactionId: transaction.id, status: transaction.status }
+    );
   }
 
   // Un événement de cycle de vie transactionnel n'est publié que pour
@@ -172,6 +187,11 @@ async function runPaymentOrchestratorInner(request: PaymentRequest): Promise<Orc
   // ci-dessus. correlationId = id de transaction pour tout le cycle de
   // vie (Prompt 26).
   await publishEvent("TransactionCreated", { reference: transaction.reference }, transaction.id);
+
+  // Déclarée hors du bloc try (revue de code) : le catch en a besoin pour
+  // savoir si un transfert fournisseur a réellement eu lieu avant que
+  // l'échec ne survienne — voir son usage plus bas.
+  let providerTransactionId: string | null = null;
 
   try {
     // Request → Validation
@@ -234,7 +254,6 @@ async function runPaymentOrchestratorInner(request: PaymentRequest): Promise<Orc
     // bloquant faute de second facteur réel à proposer.
 
     // → Provider Gateway (ignoré si virement portefeuille à portefeuille pur)
-    let providerTransactionId: string | null = null;
     if (route.provider) {
       const result = await executeProviderTransfer(request, route, fee);
       providerTransactionId = result.providerTransactionId;
@@ -283,6 +302,29 @@ async function runPaymentOrchestratorInner(request: PaymentRequest): Promise<Orc
       orchestratorError.code === "TIMEOUT" ? "expired" : failureStatusFor(phase);
 
     await safeTransition(transaction.id, targetStatus, `${orchestratorError.code}: ${orchestratorError.message}`);
+
+    // Filet de sécurité (revue de code) : si le transfert fournisseur a
+    // réellement réussi (l'argent a bougé côté fournisseur) mais qu'une
+    // étape suivante a échoué avant le règlement (ex. l'écriture de
+    // transition provider_confirmed elle-même), la transaction se
+    // termine ici en `failed` alors qu'un vrai mouvement a eu lieu —
+    // aucun correctif structurel sûr n'existe pour ce cas précis sans
+    // risquer de fausser la State Machine (voir docs/DECISIONS.md,
+    // TODO_DECISION). On donne au moins au Reconciliation Engine
+    // (Prompt 24) — dont c'est exactement le rôle : comparer l'état réel
+    // côté fournisseur à l'état Naminto.Ex — une chance de détecter et
+    // signaler l'écart, plutôt que de laisser un mouvement fournisseur
+    // réel totalement invisible.
+    if (providerTransactionId) {
+      try {
+        await scheduleReconciliation(transaction.id);
+      } catch (reconciliationErr) {
+        console.error(
+          "[orchestrator] scheduleReconciliation (filet de sécurité après échec post-transfert) a échoué",
+          reconciliationErr
+        );
+      }
+    }
 
     // TransactionFailed couvre tout statut d'échec (failed/rejected/
     // expired/cancelled) — le prompt ne nomme qu'un seul événement
