@@ -95,7 +95,17 @@ export async function previewFeeAction(input: FeePreviewInput): Promise<FeePrevi
 
 export type SendMoneyRecipient =
   | { mode: "internal"; recipientUserId: string }
-  | { mode: "external"; sourceLinkedAccountId: string; destinationReference: string };
+  | { mode: "external"; sourceLinkedAccountId: string; destinationReference: string }
+  /** Dépôt — recharge le portefeuille Naminto.Ex depuis un compte lié du
+   *  titulaire (jamais celui d'un tiers, voir orchestrator-steps/routing.ts). */
+  | { mode: "deposit"; linkedAccountId: string }
+  /** Retrait — envoie du portefeuille Naminto.Ex vers un compte lié du
+   *  titulaire. Même combinaison source/destination que le dépôt, sens
+   *  inversé — toutes deux déjà supportées par le Routing (Prompt 09),
+   *  le Ledger (ADR-039) et le Risk Engine (le compte lié du titulaire
+   *  n'est jamais traité comme un bénéficiaire) depuis leur construction
+   *  d'origine, seule l'UI manquait. */
+  | { mode: "withdraw"; linkedAccountId: string };
 
 export interface SendMoneyInput {
   /** Généré une seule fois côté client à l'entrée du récapitulatif —
@@ -157,26 +167,55 @@ export async function sendMoneyAction(input: SendMoneyInput): Promise<SendMoneyR
     deviceFingerprint: await getOrCreateDeviceCookie(),
   };
 
-  const request: PaymentRequest =
-    input.recipient.mode === "internal"
-      ? {
-          ...base,
-          recipientUserId: input.recipient.recipientUserId,
-          sourceType: "naminto_wallet",
-          sourceLinkedAccountId: null,
-          destinationType: "naminto_wallet",
-          destinationLinkedAccountId: null,
-          destinationExternalReference: null,
-        }
-      : {
-          ...base,
-          recipientUserId: null,
-          sourceType: "linked_account",
-          sourceLinkedAccountId: input.recipient.sourceLinkedAccountId,
-          destinationType: "external",
-          destinationLinkedAccountId: null,
-          destinationExternalReference: input.recipient.destinationReference,
-        };
+  let request: PaymentRequest;
+  switch (input.recipient.mode) {
+    case "internal":
+      request = {
+        ...base,
+        recipientUserId: input.recipient.recipientUserId,
+        sourceType: "naminto_wallet",
+        sourceLinkedAccountId: null,
+        destinationType: "naminto_wallet",
+        destinationLinkedAccountId: null,
+        destinationExternalReference: null,
+      };
+      break;
+    case "external":
+      request = {
+        ...base,
+        recipientUserId: null,
+        sourceType: "linked_account",
+        sourceLinkedAccountId: input.recipient.sourceLinkedAccountId,
+        destinationType: "external",
+        destinationLinkedAccountId: null,
+        destinationExternalReference: input.recipient.destinationReference,
+      };
+      break;
+    case "deposit":
+      // Portefeuille ← compte lié, même titulaire des deux côtés.
+      request = {
+        ...base,
+        recipientUserId: user.id,
+        sourceType: "linked_account",
+        sourceLinkedAccountId: input.recipient.linkedAccountId,
+        destinationType: "naminto_wallet",
+        destinationLinkedAccountId: null,
+        destinationExternalReference: null,
+      };
+      break;
+    case "withdraw":
+      // Compte lié ← portefeuille, même titulaire des deux côtés.
+      request = {
+        ...base,
+        recipientUserId: null,
+        sourceType: "naminto_wallet",
+        sourceLinkedAccountId: null,
+        destinationType: "linked_account",
+        destinationLinkedAccountId: input.recipient.linkedAccountId,
+        destinationExternalReference: null,
+      };
+      break;
+  }
 
   try {
     const { transaction } = await runPaymentOrchestrator(request);

@@ -565,4 +565,80 @@ describe("Payment Orchestrator (intégration)", () => {
     // Une seule séquence de transitions malgré les deux appels.
     expect(events).toHaveLength(7);
   });
+
+  // Placés en dernier volontairement : ces deux tests exécutent des
+  // transactions réelles supplémentaires pour le même userId partagé,
+  // ce qui augmente `frequencyLastHour` (Risk Engine) pour tout test
+  // s'exécutant après eux dans ce fichier — plus tôt dans la suite, ils
+  // faisaient basculer FRAUD-001 (fraud-engine/rules.ts) sur le test
+  // PROVIDER_ERROR, qui suppose un historique de fréquence faible.
+  it("dépôt : compte lié → portefeuille (même titulaire), débite le fournisseur et crédite le portefeuille", async () => {
+    const linkedAccountId = await linkSandboxAccount(`+22506${randomUUID().slice(0, 8)}`);
+    const request = baseRequest({
+      sourceType: "linked_account",
+      sourceLinkedAccountId: linkedAccountId,
+      destinationType: "naminto_wallet",
+      recipientUserId: userId,
+      destinationExternalReference: null,
+      amount: 3_000,
+    });
+
+    const { transaction, replayed } = await runPaymentOrchestrator(request);
+    createdTransactionIds.push(transaction.id);
+
+    expect(replayed).toBe(false);
+    expect(transaction.status).toBe("settled");
+    expect(transaction.provider_transaction_id).toMatch(/^orange_/);
+
+    // Écritures Ledger réellement équilibrées : provider_suspense débité,
+    // user_wallet du titulaire crédité (ADR-039) — jamais seulement le
+    // statut de la transaction, la vraie preuve est dans le Ledger.
+    const { data: entries } = await admin
+      .from("ledger_entries")
+      .select("account_id, direction, amount")
+      .eq("transaction_id", transaction.id);
+    const { data: accounts } = await admin
+      .from("ledger_accounts")
+      .select("id, owner_type, owner_id")
+      .in("id", (entries ?? []).map((e) => e.account_id));
+    const accountById = new Map((accounts ?? []).map((a) => [a.id, a]));
+    const walletCredit = (entries ?? []).find(
+      (e) => e.direction === "credit" && accountById.get(e.account_id)?.owner_type === "user_wallet"
+    );
+    expect(accountById.get(walletCredit!.account_id)?.owner_id).toBe(userId);
+    expect(Number(walletCredit?.amount)).toBeCloseTo(3_000);
+  });
+
+  it("retrait : portefeuille → compte lié (même titulaire), débite le portefeuille et crédite le fournisseur", async () => {
+    const linkedAccountId = await linkSandboxAccount(`+22505${randomUUID().slice(0, 8)}`);
+    const request = baseRequest({
+      sourceType: "naminto_wallet",
+      destinationType: "linked_account",
+      destinationLinkedAccountId: linkedAccountId,
+      destinationExternalReference: null,
+      recipientUserId: null,
+      amount: 1_000,
+    });
+
+    const { transaction, replayed } = await runPaymentOrchestrator(request);
+    createdTransactionIds.push(transaction.id);
+
+    expect(replayed).toBe(false);
+    expect(transaction.status).toBe("settled");
+    expect(transaction.provider_transaction_id).toMatch(/^orange_/);
+
+    const { data: entries } = await admin
+      .from("ledger_entries")
+      .select("account_id, direction, amount")
+      .eq("transaction_id", transaction.id);
+    const { data: accounts } = await admin
+      .from("ledger_accounts")
+      .select("id, owner_type, owner_id")
+      .in("id", (entries ?? []).map((e) => e.account_id));
+    const accountById = new Map((accounts ?? []).map((a) => [a.id, a]));
+    const walletDebit = (entries ?? []).find(
+      (e) => e.direction === "debit" && accountById.get(e.account_id)?.owner_type === "user_wallet"
+    );
+    expect(accountById.get(walletDebit!.account_id)?.owner_id).toBe(userId);
+  });
 });

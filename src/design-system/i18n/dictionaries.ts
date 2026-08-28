@@ -63,6 +63,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "shell.more": "Plus",
 
     "nav.dashboard": "Tableau de bord",
+    "nav.dashboard.short": "Accueil",
     "nav.send": "Envoyer",
     "nav.receive": "Recevoir",
     "nav.request": "Demander",
@@ -97,8 +98,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "nav.admin.roles": "Rôles",
 
     "comingSoon.title": "Bientôt disponible",
-    "comingSoon.body":
-      "Cet espace sera construit à une prochaine étape du protocole des 30 prompts.",
+    "comingSoon.body": "Cette fonctionnalité est en cours de préparation et sera disponible prochainement.",
 
     "dashboard.network.title": "Votre réseau",
     "dashboard.wallet.title": "Naminto.Ex",
@@ -189,6 +189,10 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "security.event.device_added": "Nouvel appareil ajouté",
     "security.event.device_revoked": "Appareil révoqué",
     "security.event.new_device_login": "Connexion depuis un nouvel appareil",
+    "security.event.preferences_updated": "Préférences mises à jour",
+    "security.event.account_linked": "Compte lié",
+    "security.event.account_reconnected": "Compte reconnecté",
+    "security.event.account_unlinked": "Compte délié",
 
     "nav.logout": "Se déconnecter",
 
@@ -262,6 +266,11 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "session.error.expired": "Votre session a expiré. Reconnectez-vous.",
 
     "send.title": "Envoyer de l'argent",
+    "transfer.deposit.title": "Déposer",
+    "transfer.withdraw.title": "Retirer",
+    "transfer.step.account.title": "Choisir un compte",
+    "transfer.amount.fromAccount": "Depuis",
+    "transfer.amount.toAccount": "Vers",
     "send.nav.back": "Retour",
     "send.nav.cancel": "Annuler",
 
@@ -338,6 +347,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "security.event.money_request_created": "Demande d'argent créée",
     "security.event.money_request_cancelled": "Demande d'argent annulée",
     "security.event.fraud_rule_matched": "Règle anti-fraude déclenchée",
+    "security.event.compliance_requirement_applied": "Exigence de conformité appliquée",
     "security.event.kyc_status_changed": "Statut KYC modifié",
     "security.event.support_ticket_status_changed": "Statut d'un dossier support modifié",
     "security.event.admin_role_changed": "Rôle Back Office modifié",
@@ -876,6 +886,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "shell.more": "More",
 
     "nav.dashboard": "Dashboard",
+    "nav.dashboard.short": "Home",
     "nav.send": "Send",
     "nav.receive": "Receive",
     "nav.request": "Request",
@@ -910,8 +921,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "nav.admin.roles": "Roles",
 
     "comingSoon.title": "Coming soon",
-    "comingSoon.body":
-      "This space will be built in a later step of the 30-prompt protocol.",
+    "comingSoon.body": "This feature is being prepared and will be available soon.",
 
     "dashboard.network.title": "Your network",
     "dashboard.wallet.title": "Naminto.Ex",
@@ -1002,6 +1012,10 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "security.event.device_added": "New device added",
     "security.event.device_revoked": "Device revoked",
     "security.event.new_device_login": "Sign-in from a new device",
+    "security.event.preferences_updated": "Preferences updated",
+    "security.event.account_linked": "Account linked",
+    "security.event.account_reconnected": "Account reconnected",
+    "security.event.account_unlinked": "Account unlinked",
 
     "nav.logout": "Sign out",
 
@@ -1075,6 +1089,11 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "session.error.expired": "Your session has expired. Please sign in again.",
 
     "send.title": "Send money",
+    "transfer.deposit.title": "Deposit",
+    "transfer.withdraw.title": "Withdraw",
+    "transfer.step.account.title": "Choose an account",
+    "transfer.amount.fromAccount": "From",
+    "transfer.amount.toAccount": "To",
     "send.nav.back": "Back",
     "send.nav.cancel": "Cancel",
 
@@ -1151,6 +1170,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "security.event.money_request_created": "Money request created",
     "security.event.money_request_cancelled": "Money request cancelled",
     "security.event.fraud_rule_matched": "Anti-fraud rule triggered",
+    "security.event.compliance_requirement_applied": "Compliance requirement applied",
     "security.event.kyc_status_changed": "KYC status changed",
     "security.event.support_ticket_status_changed": "Support ticket status changed",
     "security.event.admin_role_changed": "Back Office role changed",

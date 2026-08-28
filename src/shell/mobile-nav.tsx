@@ -37,12 +37,14 @@ export function MobileNav({ items, title }: { items: NavItem[]; title: string })
             href={item.href}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium",
+              "flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium transition-colors active:scale-95",
               active ? "text-brand" : "text-text-secondary"
             )}
           >
             <Icon className="size-5" aria-hidden />
-            {t(item.labelKey)}
+            <span className="max-w-full truncate whitespace-nowrap px-0.5">
+              {t(item.mobileLabelKey ?? item.labelKey)}
+            </span>
           </Link>
         );
       })}

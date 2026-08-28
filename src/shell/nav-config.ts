@@ -39,12 +39,14 @@ export type NavItem = {
   icon: LucideIcon;
   /** Affiché dans la barre d'onglets mobile (sous-ensemble restreint). */
   primary?: boolean;
+  /** Libellé plus court réservé à la barre d'onglets mobile (largeur très contrainte) — absent = `labelKey` réutilisé tel quel. */
+  mobileLabelKey?: string;
   /** Prompt 23 — absente = visible par tout rôle admin (ex. modules encore STUB). */
   permission?: Permission;
 };
 
 export const userNavItems: NavItem[] = [
-  { href: "/", labelKey: "nav.dashboard", icon: LayoutDashboard, primary: true },
+  { href: "/", labelKey: "nav.dashboard", mobileLabelKey: "nav.dashboard.short", icon: LayoutDashboard, primary: true },
   { href: "/send", labelKey: "nav.send", icon: ArrowUpRight, primary: true },
   { href: "/receive", labelKey: "nav.receive", icon: ArrowDownLeft, primary: true },
   { href: "/history", labelKey: "nav.history", icon: History, primary: true },
@@ -58,7 +60,7 @@ export const userNavItems: NavItem[] = [
 ];
 
 export const adminNavItems: NavItem[] = [
-  { href: "/admin", labelKey: "nav.admin.dashboard", icon: LayoutDashboard, primary: true, permission: "dashboard.read" },
+  { href: "/admin", labelKey: "nav.admin.dashboard", mobileLabelKey: "nav.dashboard.short", icon: LayoutDashboard, primary: true, permission: "dashboard.read" },
   { href: "/admin/users", labelKey: "nav.admin.users", icon: Users, primary: true, permission: "user.read" },
   {
     href: "/admin/transactions",

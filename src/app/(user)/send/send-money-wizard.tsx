@@ -2,19 +2,8 @@
 
 import Link from "next/link";
 import { useState, useTransition, type ReactNode } from "react";
-import { ArrowLeft, CheckCircle2, QrCode, Smartphone, Wallet } from "lucide-react";
-import {
-  Alert,
-  Badge,
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  EmptyState,
-  Input,
-  Spinner,
-} from "@/design-system";
+import { CheckCircle2, QrCode, Smartphone, Wallet } from "lucide-react";
+import { Alert, Badge, Button, Card, CardContent, EmptyState, Input, Spinner } from "@/design-system";
 import { useLocale } from "@/design-system/i18n/locale-provider";
 import { getProviderConfig, maskExternalReference } from "@/domains/accounts/providers";
 import {
@@ -26,6 +15,7 @@ import {
   type SendMoneyResult,
 } from "@/domains/payments/actions";
 import type { FeePayer, Provider } from "@/lib/supabase/database.types";
+import { StepShell, SummaryRow } from "./step-shell";
 
 type LinkedAccountOption = {
   id: string;
@@ -70,46 +60,6 @@ function ChoiceCard({
   );
 }
 
-function StepShell({
-  title,
-  onBack,
-  backLabel,
-  children,
-}: {
-  title: string;
-  onBack?: () => void;
-  backLabel: string;
-  children: ReactNode;
-}) {
-  return (
-    <Card>
-      <CardHeader className="flex-row items-center gap-2">
-        {onBack && (
-          <button
-            type="button"
-            onClick={onBack}
-            aria-label={backLabel}
-            className="rounded-md p-1 text-text-secondary hover:bg-surface-sunken"
-          >
-            <ArrowLeft className="size-4" aria-hidden />
-          </button>
-        )}
-        <CardTitle>{title}</CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">{children}</CardContent>
-    </Card>
-  );
-}
-
-function SummaryRow({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
-  return (
-    <div className="flex justify-between">
-      <span className="text-text-secondary">{label}</span>
-      <span className={strong ? "font-medium text-text-primary" : "text-text-primary"}>{value}</span>
-    </div>
-  );
-}
-
 export interface InitialRecipient {
   userId: string;
   namintoId: string;
@@ -119,9 +69,12 @@ export interface InitialRecipient {
 export function SendMoneyWizard({
   linkedAccounts,
   initialRecipient,
+  initialSource,
 }: {
   linkedAccounts: LinkedAccountOption[];
   initialRecipient?: InitialRecipient | null;
+  /** Compte source préréglé (tableau de bord — carte cliquée) : "wallet" ou l'id d'un compte lié actif, déjà revérifié côté serveur. */
+  initialSource?: "wallet" | string | null;
 }) {
   const { t, locale } = useLocale();
 
@@ -129,9 +82,26 @@ export function SendMoneyWizard({
   // l'étape Montant, déjà vérifié côté serveur avant le rendu de cette
   // page — jamais un scan qui exécute quoi que ce soit, seulement un
   // pré-remplissage, la confirmation explicite reste entière plus loin.
-  const [step, setStep] = useState<Step>(initialRecipient ? "amount" : "recipientType");
-  const [mode, setMode] = useState<RecipientMode | null>(initialRecipient ? "internal" : null);
-  const [linkedAccountId, setLinkedAccountId] = useState<string | null>(null);
+  // Source préremplie (tableau de bord) : saute directement à l'étape
+  // Bénéficiaire — le type d'envoi et, le cas échéant, le compte lié
+  // sont déjà déterminés, il ne reste qu'à indiquer à qui envoyer.
+  // `initialRecipient` a priorité si les deux sont fournis (prefill plus
+  // complet — n'arrive jamais depuis cette UI, seulement en théorie
+  // depuis une URL forgée).
+  const initialMode: RecipientMode | null = initialRecipient
+    ? "internal"
+    : initialSource === "wallet"
+      ? "internal"
+      : initialSource
+        ? "external"
+        : null;
+  const initialStep: Step = initialRecipient ? "amount" : initialSource ? "recipientDetails" : "recipientType";
+
+  const [step, setStep] = useState<Step>(initialStep);
+  const [mode, setMode] = useState<RecipientMode | null>(initialMode);
+  const [linkedAccountId, setLinkedAccountId] = useState<string | null>(
+    initialSource && initialSource !== "wallet" ? initialSource : null
+  );
 
   const [namintoId, setNamintoId] = useState(initialRecipient?.namintoId ?? "");
   const [lookupPending, startLookup] = useTransition();
