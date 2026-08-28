@@ -56,10 +56,23 @@ export interface ProviderRefundResult {
 
 export interface ProviderWebhookEvent {
   type: string;
+  /** Identifiant d'événement fourni par le fournisseur — clé d'idempotence (Prompt 25). */
+  eventId: string;
+  /** Horodatage revendiqué par le payload (ISO 8601) — utilisé pour la fenêtre anti-rejeu et la détection hors-ordre (Prompt 25). */
+  occurredAt: string;
   providerTransactionId?: string;
   status?: ProviderTransactionStatus;
   raw: unknown;
 }
+
+/**
+ * Résultat de vérification (Prompt 25) — jamais une exception : une
+ * signature invalide ou un payload malformé doivent rester audités
+ * (webhook_events), pas seulement journalisés en erreur puis perdus.
+ */
+export type ProviderWebhookVerification =
+  | { valid: true; event: ProviderWebhookEvent }
+  | { valid: false; reason: "missing_signature" | "invalid_signature" | "invalid_payload" };
 
 export interface ProviderHealth {
   status: HealthStatus;
@@ -82,6 +95,6 @@ export interface ProviderAdapter {
   getTransactionStatus(providerTransactionId: string): Promise<ProviderTransferResult>;
   cancelTransaction(providerTransactionId: string): Promise<ProviderCancelResult>;
   refund(providerTransactionId: string, amount?: number): Promise<ProviderRefundResult>;
-  verifyAndParseWebhook(payload: string, signature: string | null): Promise<ProviderWebhookEvent>;
+  verifyAndParseWebhook(payload: string, signature: string | null): Promise<ProviderWebhookVerification>;
   healthCheck(): Promise<ProviderHealth>;
 }

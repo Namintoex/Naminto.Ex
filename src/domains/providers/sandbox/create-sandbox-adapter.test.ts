@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { describe, expect, it } from "vitest";
 import { createSandboxAdapter } from "./create-sandbox-adapter";
+import { signSandboxWebhook } from "./webhook-signature";
 
 function newAdapter(startingBalance = 10_000) {
   return createSandboxAdapter({
@@ -124,5 +125,56 @@ describe("createSandboxAdapter", () => {
   it("expose mode: SANDBOX — jamais REAL sans intégration effective", async () => {
     const adapter = newAdapter();
     expect(adapter.mode).toBe("SANDBOX");
+  });
+
+  describe("verifyAndParseWebhook (Prompt 25)", () => {
+    it("accepte un payload correctement signé et bien formé, et en extrait les champs", async () => {
+      const adapter = newAdapter();
+      const payload = JSON.stringify({
+        type: "transfer.confirmed",
+        event_id: "evt_1",
+        occurred_at: new Date().toISOString(),
+        provider_transaction_id: "orange_abc123",
+        status: "confirmed",
+      });
+      const result = await adapter.verifyAndParseWebhook(payload, signSandboxWebhook(payload));
+      expect(result.valid).toBe(true);
+      if (result.valid) {
+        expect(result.event).toMatchObject({
+          type: "transfer.confirmed",
+          eventId: "evt_1",
+          providerTransactionId: "orange_abc123",
+          status: "confirmed",
+        });
+      }
+    });
+
+    it("rejette une signature absente (authentification)", async () => {
+      const adapter = newAdapter();
+      const payload = JSON.stringify({ type: "x", event_id: "evt_2", occurred_at: new Date().toISOString() });
+      const result = await adapter.verifyAndParseWebhook(payload, null);
+      expect(result).toEqual({ valid: false, reason: "missing_signature" });
+    });
+
+    it("rejette une signature invalide (protection falsification)", async () => {
+      const adapter = newAdapter();
+      const payload = JSON.stringify({ type: "x", event_id: "evt_3", occurred_at: new Date().toISOString() });
+      const result = await adapter.verifyAndParseWebhook(payload, "t=1,v1=" + "0".repeat(64));
+      expect(result).toEqual({ valid: false, reason: "invalid_signature" });
+    });
+
+    it("rejette un JSON malformé correctement signé (protection payload invalide)", async () => {
+      const adapter = newAdapter();
+      const payload = "not-json";
+      const result = await adapter.verifyAndParseWebhook(payload, signSandboxWebhook(payload));
+      expect(result).toEqual({ valid: false, reason: "invalid_payload" });
+    });
+
+    it("rejette un payload bien formé JSON mais incomplet (champs requis absents)", async () => {
+      const adapter = newAdapter();
+      const payload = JSON.stringify({ type: "x" }); // event_id/occurred_at manquants
+      const result = await adapter.verifyAndParseWebhook(payload, signSandboxWebhook(payload));
+      expect(result).toEqual({ valid: false, reason: "invalid_payload" });
+    });
   });
 });

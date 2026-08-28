@@ -49,6 +49,8 @@ export const PERMISSIONS = [
   "role.manage",
   "reconciliation.read",
   "reconciliation.manage",
+  "webhook.read",
+  "webhook.manage",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -76,7 +78,15 @@ export const ROLE_PERMISSIONS: Record<AdminRole, Permission[]> = {
     "reconciliation.read",
     "reconciliation.manage",
   ],
-  operations: ["dashboard.read", "provider.read", "provider.manage", "notification.read", "notification.manage"],
+  operations: [
+    "dashboard.read",
+    "provider.read",
+    "provider.manage",
+    "notification.read",
+    "notification.manage",
+    "webhook.read",
+    "webhook.manage",
+  ],
   security: ["dashboard.read", "user.read", "user.suspend", "audit.read", "transaction.read"],
   legal: ["dashboard.read", "legal.manage", "faq.manage", "country.manage"],
   super_admin: [...PERMISSIONS],

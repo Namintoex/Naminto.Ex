@@ -11,8 +11,27 @@ import type {
   ProviderRefundResult,
   ProviderTransferParams,
   ProviderTransferResult,
-  ProviderWebhookEvent,
+  ProviderWebhookVerification,
 } from "../types";
+import { verifySandboxWebhookSignature } from "./webhook-signature";
+
+function isPlausibleWebhookPayload(value: unknown): value is {
+  type: string;
+  event_id: string;
+  occurred_at: string;
+  provider_transaction_id?: string;
+  status?: string;
+} {
+  if (typeof value !== "object" || value === null) return false;
+  const record = value as Record<string, unknown>;
+  return (
+    typeof record.type === "string" &&
+    typeof record.event_id === "string" &&
+    record.event_id.length > 0 &&
+    typeof record.occurred_at === "string" &&
+    !Number.isNaN(Date.parse(record.occurred_at))
+  );
+}
 
 export interface SandboxProviderConfig {
   provider: Provider;
@@ -142,15 +161,32 @@ export function createSandboxAdapter(config: SandboxProviderConfig): ProviderAda
       return { supported: true, success: true, providerRefundId: `${config.provider}_rf_${randomUUID()}` };
     },
 
-    async verifyAndParseWebhook(payload: string): Promise<ProviderWebhookEvent> {
-      // SANDBOX : aucune signature réelle à vérifier — voir Prompt 25
-      // (Webhooks) pour la vérification de signature en conditions réelles.
-      try {
-        const raw = JSON.parse(payload);
-        return { type: "sandbox.event", raw };
-      } catch {
-        return { type: "sandbox.unparsed", raw: payload };
+    async verifyAndParseWebhook(payload: string, signature: string | null): Promise<ProviderWebhookVerification> {
+      if (!verifySandboxWebhookSignature(payload, signature)) {
+        return { valid: false, reason: signature ? "invalid_signature" : "missing_signature" };
       }
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(payload);
+      } catch {
+        return { valid: false, reason: "invalid_payload" };
+      }
+      if (!isPlausibleWebhookPayload(parsed)) {
+        return { valid: false, reason: "invalid_payload" };
+      }
+
+      return {
+        valid: true,
+        event: {
+          type: parsed.type,
+          eventId: parsed.event_id,
+          occurredAt: parsed.occurred_at,
+          providerTransactionId: parsed.provider_transaction_id,
+          status: parsed.status as ProviderTransferResult["status"] | undefined,
+          raw: parsed,
+        },
+      };
     },
 
     async healthCheck(): Promise<ProviderHealth> {

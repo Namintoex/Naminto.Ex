@@ -1,16 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getProviderAdapter } from "@/domains/providers/registry";
+import { processIncomingWebhook } from "@/domains/webhooks";
 import type { Provider } from "@/lib/supabase/database.types";
 
 const VALID_PROVIDERS: Provider[] = ["orange", "mtn", "moov", "wave", "prepaid_card"];
 
 /**
- * Point d'entrée générique des webhooks fournisseurs (Prompt 07).
- * En mode SANDBOX, aucun fournisseur réel n'appelle jamais cette route —
- * elle démontre le contrat de l'interface ProviderAdapter. La
- * persistance des événements (idempotence, rejeu contrôlé) est prévue
- * au Prompt 25 (Webhooks), une fois le domaine Transaction (Prompt 08)
- * disponible pour les rattacher à une opération réelle.
+ * Point d'entrée générique des webhooks fournisseurs (Prompt 07, câblé
+ * réellement au Prompt 25). Toute la logique — signature, idempotence,
+ * fraîcheur, ordre, audit — vit dans processIncomingWebhook (testable
+ * directement, sans passer par le runtime de route Next.js).
  */
 export async function POST(
   request: NextRequest,
@@ -25,10 +23,10 @@ export async function POST(
   const payload = await request.text();
   const signature = request.headers.get("x-webhook-signature");
 
-  const adapter = getProviderAdapter(provider as Provider);
-  const event = await adapter.verifyAndParseWebhook(payload, signature);
+  const result = await processIncomingWebhook(provider as Provider, payload, signature);
 
-  console.info("[webhook]", provider, event.type);
-
-  return NextResponse.json({ received: true });
+  return NextResponse.json(
+    { received: true, status: result.status, ...(result.reason ? { reason: result.reason } : {}) },
+    { status: result.httpStatus }
+  );
 }

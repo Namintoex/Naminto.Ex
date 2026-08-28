@@ -26,6 +26,7 @@ import {
   ShieldCheck,
   Siren,
   Users,
+  Webhook,
   type LucideIcon,
 } from "lucide-react";
 import type { Permission } from "@/domains/rbac/types";
@@ -67,6 +68,7 @@ export const adminNavItems: NavItem[] = [
   { href: "/admin/ledger", labelKey: "nav.admin.ledger", icon: BookOpen, primary: true, permission: "ledger.read" },
   { href: "/admin/kyc", labelKey: "nav.admin.kyc", icon: BadgeCheck, permission: "kyc.read" },
   { href: "/admin/providers", labelKey: "nav.admin.providers", icon: Plug, permission: "provider.read" },
+  { href: "/admin/webhooks", labelKey: "nav.admin.webhooks", icon: Webhook, permission: "webhook.read" },
   {
     href: "/admin/reconciliation",
     labelKey: "nav.admin.reconciliation",

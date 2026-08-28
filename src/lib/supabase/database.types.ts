@@ -43,6 +43,7 @@ export type ReconciliationAnomalyType =
   | "status_mismatch"
   | "settlement_mismatch";
 export type ReconciliationAnomalyStatus = "open" | "investigating" | "resolved" | "closed";
+export type WebhookEventStatus = "processed" | "duplicate" | "rejected";
 export type AdminRole =
   | "support"
   | "kyc"
@@ -715,6 +716,43 @@ export interface Database {
           status: ReconciliationAnomalyStatus;
           note: string | null;
         }>;
+        Relationships: [];
+      };
+      webhook_events: {
+        Row: {
+          id: string;
+          provider: Provider;
+          event_id: string;
+          event_type: string;
+          provider_transaction_id: string | null;
+          transaction_id: string | null;
+          occurred_at: string | null;
+          received_at: string;
+          signature_valid: boolean;
+          status: WebhookEventStatus;
+          reject_reason: string | null;
+          payload: Record<string, unknown>;
+          replay_of: string | null;
+          replayed_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          provider: Provider;
+          event_id: string;
+          event_type: string;
+          provider_transaction_id?: string | null;
+          transaction_id?: string | null;
+          occurred_at?: string | null;
+          received_at?: string;
+          signature_valid: boolean;
+          status: WebhookEventStatus;
+          reject_reason?: string | null;
+          payload: Record<string, unknown>;
+          replay_of?: string | null;
+          replayed_by?: string | null;
+        };
+        Update: never;
         Relationships: [];
       };
     };
