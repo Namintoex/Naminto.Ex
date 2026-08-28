@@ -3,21 +3,23 @@ import { OrchestratorError } from "../orchestrator-errors";
 import { isValidPinFormat } from "@/domains/identity/pin";
 import type { PaymentRequest } from "./types";
 
-const SUPPORTED_CURRENCIES = ["XOF"];
-
 /**
  * Étape 1 — Validation structurelle. Pure : aucun accès base, aucun
  * effet de bord. Ne vérifie que la forme de la requête, pas les règles
- * métier (Risk/Compliance/Limits, étapes suivantes).
+ * métier (Risk/Compliance/Limits, étapes suivantes). `supportedCurrencies`
+ * est résolu par l'appelant (orchestrator.ts, via
+ * countries/profile.ts::listActiveCurrencies) — jamais une liste codée
+ * en dur ici : aucune partie du cœur financier ne doit supposer
+ * « FCFA uniquement » (Prompt 29, ADR-057).
  */
-export function validateRequest(request: PaymentRequest): void {
+export function validateRequest(request: PaymentRequest, supportedCurrencies: readonly string[]): void {
   if (!request.senderUserId) {
     throw new OrchestratorError("VALIDATION_ERROR", "senderUserId manquant");
   }
   if (!Number.isFinite(request.amount) || request.amount <= 0) {
     throw new OrchestratorError("VALIDATION_ERROR", "Le montant doit être strictement positif");
   }
-  if (!SUPPORTED_CURRENCIES.includes(request.currency)) {
+  if (!supportedCurrencies.includes(request.currency)) {
     throw new OrchestratorError("VALIDATION_ERROR", `Devise non supportée: ${request.currency}`);
   }
   if (!isValidPinFormat(request.pin)) {

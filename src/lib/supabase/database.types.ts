@@ -615,6 +615,10 @@ export interface Database {
           code: string;
           name: string;
           currency: string;
+          languages: Locale[];
+          providers: Provider[];
+          rails: string[];
+          privacy_notes: string | null;
           active: boolean;
           created_at: string;
           updated_at: string;
@@ -624,12 +628,20 @@ export interface Database {
           code: string;
           name: string;
           currency?: string;
+          languages?: Locale[];
+          providers?: Provider[];
+          rails?: string[];
+          privacy_notes?: string | null;
           active?: boolean;
         };
         Update: Partial<{
           code: string;
           name: string;
           currency: string;
+          languages: Locale[];
+          providers: Provider[];
+          rails: string[];
+          privacy_notes: string | null;
           active: boolean;
         }>;
         Relationships: [];
@@ -674,6 +686,7 @@ export interface Database {
           content: string;
           version: string;
           published: boolean;
+          country: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -685,6 +698,7 @@ export interface Database {
           content: string;
           version?: string;
           published?: boolean;
+          country?: string | null;
         };
         Update: Partial<{
           type: LegalDocumentType;
@@ -693,6 +707,7 @@ export interface Database {
           content: string;
           version: string;
           published: boolean;
+          country: string | null;
         }>;
         Relationships: [];
       };

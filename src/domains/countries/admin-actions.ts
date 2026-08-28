@@ -2,15 +2,16 @@
 
 import { revalidatePath } from "next/cache";
 import { checkPermission } from "@/domains/rbac";
-import { adminCreateCountry, adminSetCountryActive, type AdminActionResult } from "./admin-mutations";
+import {
+  adminCreateCountry,
+  adminSetCountryActive,
+  type AdminActionResult,
+  type AdminCreateCountryInput,
+} from "./admin-mutations";
 
 export type { AdminActionResult };
 
-export async function adminCreateCountryAction(input: {
-  code: string;
-  name: string;
-  currency: string;
-}): Promise<AdminActionResult> {
+export async function adminCreateCountryAction(input: AdminCreateCountryInput): Promise<AdminActionResult> {
   const auth = await checkPermission("country.manage");
   if (!auth.ok) return { ok: false, error: "admin.error.forbidden" };
 

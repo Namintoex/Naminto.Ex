@@ -16,6 +16,7 @@ import { scheduleReconciliation } from "./orchestrator-steps/reconciliation";
 import { publishEvent } from "@/domains/event-bus";
 import { getRequestId } from "@/domains/observability/request-context";
 import { logApiRequest } from "@/domains/observability/log-request";
+import { listActiveCurrencies } from "@/domains/countries/profile";
 import type { PaymentRequest, ResolvedRoute } from "./orchestrator-steps/types";
 import type { Database } from "@/lib/supabase/database.types";
 
@@ -111,9 +112,11 @@ export async function runPaymentOrchestrator(request: PaymentRequest): Promise<O
  * reste un point d'entrée unique, jamais mêlée à la logique métier.
  */
 async function runPaymentOrchestratorInner(request: PaymentRequest): Promise<OrchestratorResult> {
-  // 1. Validation structurelle — avant toute écriture.
+  // 1. Validation structurelle — avant toute écriture. Devises résolues
+  // depuis les pays actifs (Prompt 29) : jamais une liste codée en dur.
   try {
-    validateRequest(request);
+    const supportedCurrencies = await listActiveCurrencies();
+    validateRequest(request, supportedCurrencies);
   } catch (err) {
     if (err instanceof OrchestratorError) throw err;
     throw new OrchestratorError("SYSTEM_ERROR", `Validation: ${(err as Error).message}`);

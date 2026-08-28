@@ -475,8 +475,18 @@ Audit offensif sur les 15 catégories exigées par le prompt, mené par quatre p
 - **Rien de nouveau à corriger dans ce qui était déjà solide** : XSS, CSRF, secrets, IDOR, replay (QR/demandes d'argent/confirmation email) et attribution de rôle RBAC ont chacun été vérifiés et confirmés propres, sans modification.
 - **Vérifié par 14 nouveaux tests** ciblant spécifiquement les races condition corrigées (appels réellement concurrents via `Promise.all`, jamais simulés séquentiellement) et les formes de données restreintes, en plus de la suite existante (toujours verte) — `tsc`, `eslint` et `npm run build` propres.
 
-## 40. Prochaines étapes
+## 40. Multi-Country / Multi-Currency (Prompt 29)
+
+`src/domains/countries/` — voir docs/DECISIONS.md ADR-057 pour le détail complet des choix et leurs justifications.
+
+- **CountryProfile est un agrégat, pas une nouvelle source de vérité** : `getCountryProfile(code)` (`profile.ts`) lit la ligne `countries` puis, en parallèle, `fee_rules`/`limit_rules`/`compliance_rules` filtrés par `country` (déjà porteurs de cette dimension depuis les Prompts 10/11/19) et `legal_documents` (`country = code OR country IS NULL`, un document `NULL` s'appliquant à tous les pays). Seuls `languages`/`providers`/`rails`/`privacy_notes` sont de véritables nouvelles colonnes sur `countries` (migration `0021_country_profile.sql`).
+- **Un seul CountryProfile réel seedé** : Côte d'Ivoire / XOF / `{orange,mtn,moov,wave,prepaid_card}` / `{mobile_money,card}` — rendant explicite ce que tout le cœur financier supposait déjà implicitement, plutôt que d'inventer un second pays sans donnée source pour le justifier.
+- **Le verrou de devise unique n'a été retiré qu'au seul endroit où il constituait une règle métier réelle** : `validateRequest` (`orchestrator-steps/validate.ts`) reste une fonction pure (aucun accès base, invariant du Prompt 09) — `supportedCurrencies` est désormais un paramètre résolu par l'appelant (`orchestrator.ts`, via `listActiveCurrencies()`), jamais une liste codée en dur dans la fonction elle-même. Les nombreux `?? "XOF"` de repli ailleurs dans le produit (Send Money, création de demande d'argent, préremplissage QR, inscription) restent délibérément non touchés — TODO_DECISION, aucune UX de sélection de pays n'existe encore.
+- **Back Office** (`/admin/countries`, `/admin/countries/[code]`) : formulaire de création étendu (langues/fournisseurs/rails/notes de confidentialité, valeurs invalides silencieusement écartées) ; nouvelle page de détail affichant le profil agrégé complet (tarification/limites/KYC-AML/documents légaux inclus).
+- **Vérifié par 8 nouveaux tests** (régression + extensibilité de `validateRequest` ; agrégation réelle de `getCountryProfile` contre le vrai projet Supabase ; parsing/filtrage des nouveaux champs du formulaire admin) en plus de la suite existante (300 tests, toujours verte) — `tsc`, `eslint` et `npm run build` propres ; vérifié manuellement dans le navigateur, y compris une régression Send Money réelle en XOF bout en bout.
+
+## 41. Prochaines étapes
 
 Conformément au protocole, les prompts sont exécutés un par un avec validation entre chaque étape :
 
-- **Prompt 29** — à confirmer avec l'utilisateur avant de commencer.
+- **Prompt 30** — à confirmer avec l'utilisateur avant de commencer.

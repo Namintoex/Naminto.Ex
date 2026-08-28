@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import {
@@ -29,19 +30,27 @@ export function CountriesView({ countries }: { countries: CountryRow[] }) {
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [currency, setCurrency] = useState("XOF");
+  const [languages, setLanguages] = useState("");
+  const [providers, setProviders] = useState("");
+  const [rails, setRails] = useState("");
+  const [privacyNotes, setPrivacyNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   function submit() {
     setError(null);
     startTransition(async () => {
-      const result = await adminCreateCountryAction({ code, name, currency });
+      const result = await adminCreateCountryAction({ code, name, currency, languages, providers, rails, privacyNotes });
       if (!result.ok) {
         setError(result.error);
         return;
       }
       setCode("");
       setName("");
+      setLanguages("");
+      setProviders("");
+      setRails("");
+      setPrivacyNotes("");
       router.refresh();
     });
   }
@@ -65,6 +74,31 @@ export function CountriesView({ countries }: { countries: CountryRow[] }) {
               onChange={(e) => setCurrency(e.target.value)}
             />
           </div>
+          <div className="grid grid-cols-3 gap-3">
+            <Input
+              label={t("admin.countries.detail.languages")}
+              placeholder="fr,en"
+              value={languages}
+              onChange={(e) => setLanguages(e.target.value)}
+            />
+            <Input
+              label={t("admin.countries.detail.providers")}
+              placeholder="orange,mtn,wave"
+              value={providers}
+              onChange={(e) => setProviders(e.target.value)}
+            />
+            <Input
+              label={t("admin.countries.detail.rails")}
+              placeholder="mobile_money,card"
+              value={rails}
+              onChange={(e) => setRails(e.target.value)}
+            />
+          </div>
+          <Input
+            label={t("admin.countries.detail.privacy")}
+            value={privacyNotes}
+            onChange={(e) => setPrivacyNotes(e.target.value)}
+          />
           <Button size="sm" loading={pending} onClick={submit} className="self-start">
             {t("admin.pricing.action.create")}
           </Button>
@@ -86,7 +120,11 @@ export function CountriesView({ countries }: { countries: CountryRow[] }) {
           <TableBody>
             {countries.map((country) => (
               <TableRow key={country.id}>
-                <TableCell className="font-medium text-text-primary">{country.code}</TableCell>
+                <TableCell className="font-medium text-text-primary">
+                  <Link href={`/admin/countries/${country.code}`} className="hover:underline">
+                    {country.code}
+                  </Link>
+                </TableCell>
                 <TableCell>{country.name}</TableCell>
                 <TableCell>{country.currency}</TableCell>
                 <TableCell>
