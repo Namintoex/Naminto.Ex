@@ -20,7 +20,15 @@ function isPublicPath(pathname: string) {
 }
 
 export async function proxy(request: NextRequest) {
+  // Request ID (Prompt 27) — propagé à toute l'application via l'en-tête
+  // x-request-id, réutilisé s'il est déjà présent (ex. fourni par un
+  // proxy en amont) plutôt que d'en générer un nouveau qui casserait la
+  // corrélation de bout en bout.
+  const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
+  request.headers.set("x-request-id", requestId);
+
   let supabaseResponse = NextResponse.next({ request });
+  supabaseResponse.headers.set("x-request-id", requestId);
 
   const supabase = createServerClient(getSupabaseUrl(), getSupabaseAnonKey(), {
     cookies: {
@@ -32,6 +40,7 @@ export async function proxy(request: NextRequest) {
           request.cookies.set(name, value);
         }
         supabaseResponse = NextResponse.next({ request });
+        supabaseResponse.headers.set("x-request-id", requestId);
         for (const { name, value, options } of cookiesToSet) {
           supabaseResponse.cookies.set(name, value, options);
         }

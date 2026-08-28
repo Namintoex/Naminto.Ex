@@ -1,4 +1,5 @@
 import {
+  Activity,
   AlertTriangle,
   ArrowDownLeft,
   ArrowLeftRight,
@@ -87,5 +88,11 @@ export const adminNavItems: NavItem[] = [
   { href: "/admin/notifications", labelKey: "nav.admin.notifications", icon: Bell, permission: "notification.read" },
   { href: "/admin/incidents", labelKey: "nav.admin.incidents", icon: Siren },
   { href: "/admin/audit", labelKey: "nav.admin.audit", icon: ClipboardList, permission: "audit.read" },
+  {
+    href: "/admin/observability",
+    labelKey: "nav.admin.observability",
+    icon: Activity,
+    permission: "observability.read",
+  },
   { href: "/admin/roles", labelKey: "nav.admin.roles", icon: KeyRound, permission: "role.manage" },
 ];

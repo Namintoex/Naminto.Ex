@@ -14,6 +14,8 @@ import { executeProviderTransfer } from "./orchestrator-steps/execute-provider";
 import { writeLedgerEntries } from "./orchestrator-steps/ledger";
 import { scheduleReconciliation } from "./orchestrator-steps/reconciliation";
 import { publishEvent } from "@/domains/event-bus";
+import { getRequestId } from "@/domains/observability/request-context";
+import { logApiRequest } from "@/domains/observability/log-request";
 import type { PaymentRequest, ResolvedRoute } from "./orchestrator-steps/types";
 import type { Database } from "@/lib/supabase/database.types";
 
@@ -75,6 +77,40 @@ async function safeTransition(
  * étape à effet de bord (PIN, fournisseur…) n'est rejouée.
  */
 export async function runPaymentOrchestrator(request: PaymentRequest): Promise<OrchestratorResult> {
+  const startedAt = Date.now();
+  const requestId = await getRequestId();
+  try {
+    const result = await runPaymentOrchestratorInner(request);
+    await logApiRequest({
+      requestId,
+      method: "ORCHESTRATOR",
+      path: "payment.orchestrator",
+      statusCode: 200,
+      durationMs: Date.now() - startedAt,
+      userId: request.senderUserId,
+    });
+    return result;
+  } catch (err) {
+    const orchestratorError = err instanceof OrchestratorError ? err : null;
+    await logApiRequest({
+      requestId,
+      method: "ORCHESTRATOR",
+      path: "payment.orchestrator",
+      statusCode: orchestratorError ? 422 : 500,
+      durationMs: Date.now() - startedAt,
+      userId: request.senderUserId,
+      errorMessage: orchestratorError ? `${orchestratorError.code}: ${orchestratorError.message}` : (err as Error).message,
+    });
+    throw err;
+  }
+}
+
+/**
+ * Corps réel de l'orchestrateur (Prompt 09/10) — séparé du wrapper
+ * ci-dessus (Prompt 27, API latency/error rate) pour que l'instrumentation
+ * reste un point d'entrée unique, jamais mêlée à la logique métier.
+ */
+async function runPaymentOrchestratorInner(request: PaymentRequest): Promise<OrchestratorResult> {
   // 1. Validation structurelle — avant toute écriture.
   try {
     validateRequest(request);

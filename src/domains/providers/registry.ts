@@ -1,6 +1,7 @@
 import "server-only";
 import type { Provider } from "@/lib/supabase/database.types";
 import type { ProviderAdapter } from "./types";
+import { instrumentAdapter } from "./instrument";
 import { OrangeSandbox } from "./sandbox/orange";
 import { MTNSandbox } from "./sandbox/mtn";
 import { MoovSandbox } from "./sandbox/moov";
@@ -13,12 +14,14 @@ import { CardSandbox } from "./sandbox/card";
  * adapter concret ailleurs dans l'application.
  *
  * Ajouter un fournisseur = 1) un adapter (voir sandbox/*.ts),
- * 2) l'enregistrer ci-dessous. Aucune autre modification requise.
+ * 2) l'enregistrer ci-dessous. Aucune autre modification requise —
+ * l'instrumentation (Prompt 27) s'applique automatiquement à chaque
+ * adapter enregistré.
  */
 const registry = new Map<Provider, ProviderAdapter>();
 
 function registerAdapter(adapter: ProviderAdapter) {
-  registry.set(adapter.provider, adapter);
+  registry.set(adapter.provider, instrumentAdapter(adapter));
 }
 
 registerAdapter(OrangeSandbox);

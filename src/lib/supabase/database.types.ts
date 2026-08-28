@@ -837,6 +837,56 @@ export interface Database {
         }>;
         Relationships: [];
       };
+      request_logs: {
+        Row: {
+          id: string;
+          request_id: string;
+          method: string;
+          path: string;
+          status_code: number;
+          duration_ms: number;
+          user_id: string | null;
+          error_message: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          request_id: string;
+          method: string;
+          path: string;
+          status_code: number;
+          duration_ms: number;
+          user_id?: string | null;
+          error_message?: string | null;
+        };
+        Update: never;
+        Relationships: [];
+      };
+      provider_call_logs: {
+        Row: {
+          id: string;
+          request_id: string | null;
+          provider: Provider;
+          operation: string;
+          duration_ms: number;
+          success: boolean;
+          error_message: string | null;
+          provider_transaction_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          request_id?: string | null;
+          provider: Provider;
+          operation: string;
+          duration_ms: number;
+          success: boolean;
+          error_message?: string | null;
+          provider_transaction_id?: string | null;
+        };
+        Update: never;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
