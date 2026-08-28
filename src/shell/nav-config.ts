@@ -20,6 +20,7 @@ import {
   MessageCircle,
   Percent,
   Plug,
+  Radio,
   Scale,
   Settings,
   ShieldAlert,
@@ -69,6 +70,7 @@ export const adminNavItems: NavItem[] = [
   { href: "/admin/kyc", labelKey: "nav.admin.kyc", icon: BadgeCheck, permission: "kyc.read" },
   { href: "/admin/providers", labelKey: "nav.admin.providers", icon: Plug, permission: "provider.read" },
   { href: "/admin/webhooks", labelKey: "nav.admin.webhooks", icon: Webhook, permission: "webhook.read" },
+  { href: "/admin/events", labelKey: "nav.admin.events", icon: Radio, permission: "event.read" },
   {
     href: "/admin/reconciliation",
     labelKey: "nav.admin.reconciliation",

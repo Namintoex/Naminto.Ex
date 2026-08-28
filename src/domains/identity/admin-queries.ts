@@ -1,5 +1,6 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { publishEvent } from "@/domains/event-bus";
 import { logSecurityEvent } from "./security-events";
 import type { Database, KycStatus } from "@/lib/supabase/database.types";
 
@@ -117,6 +118,7 @@ export async function adminUpdateKycStatus(userId: string, next: KycStatus): Pro
     type: "kyc_status_changed",
     metadata: { from: profile.kyc_status, to: next },
   });
+  await publishEvent("KYCStatusChanged", { from: profile.kyc_status, to: next }, userId);
 
   return { ok: true };
 }

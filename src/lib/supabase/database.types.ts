@@ -44,6 +44,21 @@ export type ReconciliationAnomalyType =
   | "settlement_mismatch";
 export type ReconciliationAnomalyStatus = "open" | "investigating" | "resolved" | "closed";
 export type WebhookEventStatus = "processed" | "duplicate" | "rejected";
+export type DomainEventType =
+  | "TransactionCreated"
+  | "TransactionValidated"
+  | "TransactionAuthenticated"
+  | "TransactionProcessing"
+  | "ProviderConfirmed"
+  | "TransactionSettled"
+  | "TransactionFailed"
+  | "TransactionReversed"
+  | "TransactionRefunded"
+  | "RiskDecisionMade"
+  | "KYCStatusChanged"
+  | "NotificationRequested";
+export type EventDeliveryStatus = "pending" | "succeeded" | "failed" | "dead_letter";
+export type EventDeliveryOutcome = "succeeded" | "failed";
 export type AdminRole =
   | "support"
   | "kyc"
@@ -753,6 +768,73 @@ export interface Database {
           replayed_by?: string | null;
         };
         Update: never;
+        Relationships: [];
+      };
+      domain_events: {
+        Row: {
+          id: string;
+          type: DomainEventType;
+          correlation_id: string;
+          payload: Record<string, unknown>;
+          occurred_at: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          type: DomainEventType;
+          correlation_id: string;
+          payload?: Record<string, unknown>;
+          occurred_at?: string;
+        };
+        Update: never;
+        Relationships: [];
+      };
+      event_deliveries: {
+        Row: {
+          id: string;
+          event_id: string;
+          consumer: string;
+          status: EventDeliveryStatus;
+          attempts: number;
+          next_retry_at: string | null;
+          last_error: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          event_id: string;
+          consumer: string;
+        };
+        Update: Partial<{
+          status: EventDeliveryStatus;
+          attempts: number;
+          next_retry_at: string | null;
+          last_error: string | null;
+        }>;
+        Relationships: [];
+      };
+      event_delivery_attempts: {
+        Row: {
+          id: string;
+          delivery_id: string;
+          attempt_number: number;
+          started_at: string;
+          finished_at: string | null;
+          outcome: EventDeliveryOutcome | null;
+          error: string | null;
+        };
+        Insert: {
+          id?: string;
+          delivery_id: string;
+          attempt_number: number;
+          started_at?: string;
+        };
+        Update: Partial<{
+          finished_at: string | null;
+          outcome: EventDeliveryOutcome | null;
+          error: string | null;
+        }>;
         Relationships: [];
       };
     };

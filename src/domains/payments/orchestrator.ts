@@ -12,8 +12,8 @@ import { calculateFee as calculateFeeStep } from "./orchestrator-steps/fee";
 import { routeRequest } from "./orchestrator-steps/routing";
 import { executeProviderTransfer } from "./orchestrator-steps/execute-provider";
 import { writeLedgerEntries } from "./orchestrator-steps/ledger";
-import { notifyTransactionFailed, notifyTransactionSettled } from "./orchestrator-steps/notification";
 import { scheduleReconciliation } from "./orchestrator-steps/reconciliation";
+import { publishEvent } from "@/domains/event-bus";
 import type { PaymentRequest, ResolvedRoute } from "./orchestrator-steps/types";
 import type { Database } from "@/lib/supabase/database.types";
 
@@ -128,15 +128,24 @@ export async function runPaymentOrchestrator(request: PaymentRequest): Promise<O
     return { transaction, replayed: true };
   }
 
+  // Un événement de cycle de vie transactionnel n'est publié que pour
+  // une transaction réellement neuve (jamais rejouée) — voir garde
+  // ci-dessus. correlationId = id de transaction pour tout le cycle de
+  // vie (Prompt 26).
+  await publishEvent("TransactionCreated", { reference: transaction.reference }, transaction.id);
+
   try {
     // Request → Validation
     transaction = (await transitionTransaction(transaction.id, "validating")) as Transaction;
     transaction = (await transitionTransaction(transaction.id, "authentication_required")) as Transaction;
+    await publishEvent("TransactionValidated", { reference: transaction.reference }, transaction.id);
 
     // → Authentication
     await authenticateRequest(request);
     transaction = (await transitionTransaction(transaction.id, "authenticated")) as Transaction;
+    await publishEvent("TransactionAuthenticated", { reference: transaction.reference }, transaction.id);
     transaction = (await transitionTransaction(transaction.id, "processing")) as Transaction;
+    await publishEvent("TransactionProcessing", { reference: transaction.reference }, transaction.id);
 
     // → Risk → Compliance → Limits → Fraud (Fee et Routing déjà résolus
     // ci-dessus). Compliance et Limits sont des portes déterministes
@@ -147,6 +156,11 @@ export async function runPaymentOrchestrator(request: PaymentRequest): Promise<O
     // Compliance n'ait l'occasion de statuer, y compris pour un compte
     // par ailleurs parfaitement légitime).
     const riskDecision = await checkRisk(request);
+    await publishEvent(
+      "RiskDecisionMade",
+      { level: riskDecision.level, reasons: riskDecision.reasons },
+      transaction.id
+    );
     if (riskDecision.level === "HIGH") {
       throw new OrchestratorError(
         "RISK_REJECTION",
@@ -193,27 +207,23 @@ export async function runPaymentOrchestrator(request: PaymentRequest): Promise<O
       undefined,
       { providerTransactionId }
     )) as Transaction;
+    await publishEvent("ProviderConfirmed", { reference: transaction.reference, providerTransactionId }, transaction.id);
 
     // → Ledger
     await writeLedgerEntries(transaction.id);
 
     transaction = (await transitionTransaction(transaction.id, "settled")) as Transaction;
+    await publishEvent("TransactionSettled", { reference: transaction.reference }, transaction.id);
 
     // → Notification → Reconciliation. Un règlement déjà confirmé est
     // définitif : aucun échec après ce point ne doit annuler ni faire
     // échouer l'orchestrateur (Prompt 20 — « une panne SMS ne doit
     // jamais annuler une transaction financière déjà confirmée »).
-    // notifyTransactionSettled ne lève déjà jamais, mais ce try/catch
-    // reste une défense en profondeur explicite à cet endroit précis du
-    // pipeline plutôt qu'une confiance implicite dans son implémentation.
-    try {
-      await notifyTransactionSettled(transaction);
-    } catch (err) {
-      console.error(
-        "[orchestrator] notifyTransactionSettled a échoué après règlement — transaction non affectée",
-        err
-      );
-    }
+    // publishEvent ne lève déjà jamais (Prompt 26) : la notification
+    // elle-même est désormais découplée, consommée de façon idempotente
+    // par le event bus (src/domains/event-bus/consumers/notification-consumer.ts)
+    // plutôt qu'appelée en direct depuis ce fichier.
+    await publishEvent("NotificationRequested", { kind: "settled", transaction }, transaction.id);
     try {
       await scheduleReconciliation(transaction.id);
     } catch (err) {
@@ -235,14 +245,17 @@ export async function runPaymentOrchestrator(request: PaymentRequest): Promise<O
 
     await safeTransition(transaction.id, targetStatus, `${orchestratorError.code}: ${orchestratorError.message}`);
 
-    // Symétrique du cas settled ci-dessus : une panne de notification ne
-    // doit jamais masquer l'erreur d'origine, qui reste seule à remonter
-    // à l'appelant.
-    try {
-      await notifyTransactionFailed(transaction, orchestratorError.code);
-    } catch (notifyErr) {
-      console.error("[orchestrator] notifyTransactionFailed a échoué", notifyErr);
-    }
+    // TransactionFailed couvre tout statut d'échec (failed/rejected/
+    // expired/cancelled) — le prompt ne nomme qu'un seul événement
+    // générique d'échec, pas un par statut terminal. Symétrique du cas
+    // settled ci-dessus : publishEvent ne lève jamais, l'erreur d'origine
+    // reste seule à remonter à l'appelant.
+    await publishEvent("TransactionFailed", { code: orchestratorError.code, status: targetStatus }, transaction.id);
+    await publishEvent(
+      "NotificationRequested",
+      { kind: "failed", transaction, errorCode: orchestratorError.code },
+      transaction.id
+    );
 
     throw orchestratorError;
   }

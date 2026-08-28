@@ -1,5 +1,6 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { publishEvent } from "@/domains/event-bus";
 import { getOrCreateLedgerAccount } from "./accounts";
 import {
   LedgerCurrencyMismatchError,
@@ -192,7 +193,13 @@ async function recordMirror(transactionId: string, kind: "reversal" | "refund"):
     };
   });
 
-  return writeBalancedEntries(transactionId, kind, tx.reference, entries);
+  const written = await writeBalancedEntries(transactionId, kind, tx.reference, entries);
+  await publishEvent(
+    kind === "reversal" ? "TransactionReversed" : "TransactionRefunded",
+    { reference: tx.reference },
+    transactionId
+  );
+  return written;
 }
 
 export async function recordReversal(transactionId: string): Promise<LedgerEntryRow[]> {

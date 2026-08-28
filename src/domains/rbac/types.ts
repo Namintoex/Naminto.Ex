@@ -51,6 +51,8 @@ export const PERMISSIONS = [
   "reconciliation.manage",
   "webhook.read",
   "webhook.manage",
+  "event.read",
+  "event.manage",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -86,6 +88,8 @@ export const ROLE_PERMISSIONS: Record<AdminRole, Permission[]> = {
     "notification.manage",
     "webhook.read",
     "webhook.manage",
+    "event.read",
+    "event.manage",
   ],
   security: ["dashboard.read", "user.read", "user.suspend", "audit.read", "transaction.read"],
   legal: ["dashboard.read", "legal.manage", "faq.manage", "country.manage"],
