@@ -25,8 +25,10 @@ describe("Money Requests (intégration)", () => {
   const admin = createAdminClient();
   let requesterId: string;
   let payerId: string;
+  let secondPayerId: string;
   const requesterEmail = `vitest-mr-requester-${randomUUID()}@example.test`;
   const payerEmail = `vitest-mr-payer-${randomUUID()}@example.test`;
+  const secondPayerEmail = `vitest-mr-payer2-${randomUUID()}@example.test`;
   const pin = "753159";
   const createdRequestIds: string[] = [];
   const createdTransactionIds: string[] = [];
@@ -53,8 +55,19 @@ describe("Money Requests (intégration)", () => {
       throw new Error(`Impossible de créer le payeur de test: ${payer.error?.message}`);
     }
     payerId = payer.data.user.id;
-
     await admin.from("pin_credentials").insert({ user_id: payerId, pin_hash: await hashPin(pin) });
+
+    const secondPayer = await admin.auth.admin.createUser({
+      email: secondPayerEmail,
+      password: "TestPassword2026!",
+      email_confirm: true,
+      user_metadata: { naminto_id: `vitest_mr_pay2_${randomUUID().slice(0, 8)}`, legal_name: "Vitest Second Payer" },
+    });
+    if (secondPayer.error || !secondPayer.data.user) {
+      throw new Error(`Impossible de créer le deuxième payeur de test: ${secondPayer.error?.message}`);
+    }
+    secondPayerId = secondPayer.data.user.id;
+    await admin.from("pin_credentials").insert({ user_id: secondPayerId, pin_hash: await hashPin(pin) });
   });
 
   afterAll(async () => {
@@ -72,6 +85,7 @@ describe("Money Requests (intégration)", () => {
     if (createdRequestIds.length > 0) {
       await admin.from("money_requests").delete().in("id", createdRequestIds);
     }
+    if (secondPayerId) await admin.auth.admin.deleteUser(secondPayerId);
     if (payerId) await admin.auth.admin.deleteUser(payerId);
     if (requesterId) await admin.auth.admin.deleteUser(requesterId);
   });
@@ -127,7 +141,10 @@ describe("Money Requests (intégration)", () => {
       .single();
     expect(transaction?.recipient_user_id).toBe(requesterId);
     expect(Number(transaction?.amount)).toBe(4_200);
-  });
+    // Pipeline complet de l'orchestrateur contre le vrai Supabase (~20s
+    // en isolation) — marge portée à 60s pour absorber la contention
+    // d'une suite complète (même raisonnement qu'orchestrator.test.ts).
+  }, 60_000);
 
   it("rejouer fulfillMoneyRequest sur la même demande ne crée pas de deuxième transaction (idempotent)", async () => {
     const request = await createMoneyRequest({ requesterUserId: requesterId, amount: 1_000 });
@@ -138,7 +155,7 @@ describe("Money Requests (intégration)", () => {
 
     const second = await fulfillMoneyRequest({ token: request.token, payerUserId: payerId, pin });
     expect(second.transactionId).toBe(first.transactionId);
-  });
+  }, 60_000);
 
   it("refuse de régler sa propre demande", async () => {
     const request = await createMoneyRequest({ requesterUserId: requesterId, amount: 800 });
@@ -177,4 +194,43 @@ describe("Money Requests (intégration)", () => {
       fulfillMoneyRequest({ token: randomUUID(), payerUserId: payerId, pin })
     ).rejects.toBeInstanceOf(MoneyRequestNotFoundError);
   });
+
+  it("deux payeurs concurrents sur la même demande : un seul l'emporte, jamais de mélange d'identité (Prompt 28, ADR-056)", async () => {
+    const request = await createMoneyRequest({ requesterUserId: requesterId, amount: 2_500 });
+    createdRequestIds.push(request.id);
+
+    const results = await Promise.allSettled([
+      fulfillMoneyRequest({ token: request.token, payerUserId: payerId, pin }),
+      fulfillMoneyRequest({ token: request.token, payerUserId: secondPayerId, pin }),
+    ]);
+
+    const fulfilled = results.filter((r) => r.status === "fulfilled") as PromiseFulfilledResult<
+      Awaited<ReturnType<typeof fulfillMoneyRequest>>
+    >[];
+    const rejected = results.filter((r) => r.status === "rejected") as PromiseRejectedResult[];
+
+    // Exactement un gagnant — jamais les deux, jamais aucun.
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+    expect(rejected[0].reason).toBeInstanceOf(MoneyRequestNotPendingError);
+    createdTransactionIds.push(fulfilled[0].value.transactionId);
+
+    // La transaction réellement réglée appartient au gagnant, jamais au perdant.
+    const { data: transaction } = await admin
+      .from("transactions")
+      .select("sender_user_id, status")
+      .eq("id", fulfilled[0].value.transactionId)
+      .single();
+    expect(transaction?.status).toBe("settled");
+    expect([payerId, secondPayerId]).toContain(transaction?.sender_user_id);
+
+    const { data: updatedRequest } = await admin
+      .from("money_requests")
+      .select("status, claimed_by_user_id, fulfilled_transaction_id")
+      .eq("id", request.id)
+      .single();
+    expect(updatedRequest?.status).toBe("fulfilled");
+    expect(updatedRequest?.claimed_by_user_id).toBe(transaction?.sender_user_id);
+    expect(updatedRequest?.fulfilled_transaction_id).toBe(fulfilled[0].value.transactionId);
+  }, 60_000);
 });

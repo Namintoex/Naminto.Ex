@@ -120,6 +120,21 @@ describe("Ledger — record-entries (intégration)", () => {
     expect(recipientCredit.sort((a, b) => a - b)).toEqual([175, 4_825]);
   });
 
+  it("deux appels réellement concurrents à recordSettlement ne produisent jamais deux lots (Prompt 28, ADR-056)", async () => {
+    const tx = await createTestTransaction();
+
+    const [first, second] = await Promise.all([recordSettlement(tx.id), recordSettlement(tx.id)]);
+
+    expect(second.map((e) => e.id).sort()).toEqual(first.map((e) => e.id).sort());
+
+    const { count } = await admin
+      .from("ledger_entries")
+      .select("id", { count: "exact", head: true })
+      .eq("transaction_id", tx.id)
+      .eq("kind", "settlement");
+    expect(count).toBe(first.length);
+  });
+
   it("double écriture : rejouer recordSettlement ne crée pas de deuxième lot (idempotent)", async () => {
     const tx = await createTestTransaction();
 

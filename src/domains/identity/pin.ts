@@ -50,17 +50,16 @@ export async function verifyPinForUser(userId: string, pin: string): Promise<Pin
   const valid = await verifyPinHash(pin, credentials.pin_hash);
 
   if (!valid) {
-    const attempts = credentials.failed_attempts + 1;
-    const locked = attempts >= PIN_MAX_ATTEMPTS;
-    await admin
-      .from("pin_credentials")
-      .update({
-        failed_attempts: locked ? 0 : attempts,
-        locked_until: locked
-          ? new Date(Date.now() + PIN_LOCKOUT_MINUTES * 60_000).toISOString()
-          : null,
-      })
-      .eq("user_id", userId);
+    // Incrémentation atomique côté base (Prompt 28, ADR-056) — un burst
+    // de requêtes concurrentes ne peut plus toutes lire la même valeur
+    // avant l'écriture et ainsi empêcher le verrouillage de se déclencher.
+    const { data: result } = await admin.rpc("increment_pin_failed_attempts", {
+      p_user_id: userId,
+      p_max_attempts: PIN_MAX_ATTEMPTS,
+      p_lockout_minutes: PIN_LOCKOUT_MINUTES,
+    });
+    const locked = result?.[0]?.locked ?? false;
+    const attempts = result?.[0]?.attempts ?? credentials.failed_attempts + 1;
 
     await logSecurityEvent({
       userId,

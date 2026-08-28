@@ -2,13 +2,29 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Database, NotificationDeliveryStatus } from "@/lib/supabase/database.types";
 
-type NotificationRow = Database["public"]["Tables"]["notifications"]["Row"];
 type DeliveryRow = Database["public"]["Tables"]["notification_deliveries"]["Row"];
 
 const PAGE_SIZE = 25;
 
-export interface AdminNotificationRow extends NotificationRow {
-  deliveries: DeliveryRow[];
+/**
+ * Forme volontairement restreinte (Prompt 28, ADR-056) : la liste
+ * n'affiche jamais que titre/type/date par notification et
+ * canal/statut par livraison, mais `select("*")` envoyait quand même
+ * `body` (montant et référence exacts de la transaction) au navigateur
+ * de tout admin ayant `notification.read` — non rendu, mais lisible via
+ * les outils de développement.
+ */
+export interface AdminNotificationDeliverySummary {
+  id: string;
+  channel: DeliveryRow["channel"];
+  status: DeliveryRow["status"];
+}
+export interface AdminNotificationRow {
+  id: string;
+  title: string;
+  event_type: string;
+  created_at: string;
+  deliveries: AdminNotificationDeliverySummary[];
 }
 
 /**
@@ -31,20 +47,22 @@ export async function adminListNotifications(page = 1): Promise<{
 
   const { data: notifications, count } = await admin
     .from("notifications")
-    .select("*", { count: "exact" })
+    .select("id, title, event_type, created_at", { count: "exact" })
     .order("created_at", { ascending: false })
     .range(from, to);
 
   const ids = (notifications ?? []).map((n) => n.id);
   const { data: deliveries } =
     ids.length > 0
-      ? await admin.from("notification_deliveries").select("*").in("notification_id", ids)
-      : { data: [] as DeliveryRow[] };
+      ? await admin.from("notification_deliveries").select("id, notification_id, channel, status").in("notification_id", ids)
+      : { data: [] as Pick<DeliveryRow, "id" | "notification_id" | "channel" | "status">[] };
 
-  const deliveriesByNotification = new Map<string, DeliveryRow[]>();
+  const deliveriesByNotification = new Map<string, AdminNotificationDeliverySummary[]>();
   for (const delivery of deliveries ?? []) {
     const list = deliveriesByNotification.get(delivery.notification_id) ?? [];
-    list.push(delivery);
+    // notification_id ne sert qu'au regroupement ci-dessus — jamais dans
+    // la forme finale envoyée au client (Prompt 28, ADR-056).
+    list.push({ id: delivery.id, channel: delivery.channel, status: delivery.status });
     deliveriesByNotification.set(delivery.notification_id, list);
   }
 

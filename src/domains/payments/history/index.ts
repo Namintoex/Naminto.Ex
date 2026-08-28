@@ -15,6 +15,7 @@ export {
   FRAUD_REASON_PREFIXES,
   type AdminListTransactionsResult,
   type AdminTransactionDetail,
+  type AdminTransactionSummary,
   type AdminTransactionFilters,
   type AdminDashboardStats,
 } from "./admin-queries";

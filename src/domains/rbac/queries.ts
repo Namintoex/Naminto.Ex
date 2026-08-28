@@ -11,6 +11,12 @@ import { permissionsForRoles, type AdminRole, type Permission } from "./types";
  * administrateur). Une fois cette première ligne posée, plus aucun
  * bootstrap n'a lieu : seul un super_admin peut ensuite attribuer des
  * rôles (écran /admin/roles). Voir docs/DECISIONS.md ADR-051.
+ *
+ * `bootstrap_super_admin` (RPC, migration 0020) rend le SELECT count()=0
+ * + INSERT atomiques via un verrou consultatif transactionnel — sans
+ * cela, deux comptes distincts accédant à /admin au même instant sur un
+ * projet vide pouvaient tous deux devenir super_admin (Prompt 28,
+ * ADR-056).
  */
 export async function getUserRoles(userId: string): Promise<AdminRole[]> {
   const admin = createAdminClient();
@@ -20,15 +26,9 @@ export async function getUserRoles(userId: string): Promise<AdminRole[]> {
     return ownRoles.map((r) => r.role);
   }
 
-  const { count } = await admin.from("admin_role_assignments").select("id", { count: "exact", head: true });
-  if (count === 0) {
-    const { error } = await admin.from("admin_role_assignments").insert({ user_id: userId, role: "super_admin" });
-    if (!error) {
-      return ["super_admin"];
-    }
-    // Course entre deux requêtes concurrentes sur un projet vide : l'une
-    // des deux perd sur la contrainte unique, l'autre a déjà bootstrapé.
-    // Ne jamais accorder de rôle par défaut sur un échec inattendu.
+  const { data: bootstrapped } = await admin.rpc("bootstrap_super_admin", { p_user_id: userId });
+  if (bootstrapped) {
+    return ["super_admin"];
   }
 
   return [];

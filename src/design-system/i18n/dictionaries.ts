@@ -130,6 +130,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "login.createAccount": "Créer un compte",
     "login.forgotPassword": "Mot de passe oublié ?",
     "login.error.invalidCredentials": "Identifiants incorrects.",
+    "login.error.tooManyAttempts": "Trop de tentatives. Réessayez dans quelques minutes.",
 
     "register.title": "Créer un compte Naminto.Ex",
     "register.submit": "Créer mon compte",
@@ -925,6 +926,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "login.createAccount": "Create an account",
     "login.forgotPassword": "Forgot your password?",
     "login.error.invalidCredentials": "Incorrect credentials.",
+    "login.error.tooManyAttempts": "Too many attempts. Try again in a few minutes.",
 
     "register.title": "Create a Naminto.Ex account",
     "register.submit": "Create my account",

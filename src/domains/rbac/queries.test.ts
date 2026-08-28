@@ -73,4 +73,27 @@ describe("RBAC — getUserRoles / getUserPermissions (intégration)", () => {
     expect(permissions.size).toBe(0);
     expect(await userHasPermission(unassignedUserId, "dashboard.read")).toBe(false);
   });
+
+  it("bootstrap_super_admin (RPC) reste sûr sous appels concurrents une fois la table non vide (Prompt 28, ADR-056)", async () => {
+    // La table contient déjà des lignes réelles à ce stade du projet —
+    // vérifie que deux appels concurrents à la fonction de bootstrap
+    // elle-même (pas seulement getUserRoles) refusent tous les deux,
+    // jamais un repli accordé par accident de course.
+    const fakeUserIdA = randomUUID();
+    const fakeUserIdB = randomUUID();
+
+    const [resultA, resultB] = await Promise.all([
+      admin.rpc("bootstrap_super_admin", { p_user_id: fakeUserIdA }),
+      admin.rpc("bootstrap_super_admin", { p_user_id: fakeUserIdB }),
+    ]);
+
+    expect(resultA.data).toBe(false);
+    expect(resultB.data).toBe(false);
+
+    const { count } = await admin
+      .from("admin_role_assignments")
+      .select("user_id", { count: "exact", head: true })
+      .in("user_id", [fakeUserIdA, fakeUserIdB]);
+    expect(count).toBe(0);
+  });
 });

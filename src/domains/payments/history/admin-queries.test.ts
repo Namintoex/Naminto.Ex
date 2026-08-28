@@ -2,7 +2,12 @@ import { randomUUID } from "crypto";
 import { afterAll, describe, expect, it } from "vitest";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { TransactionStatus } from "../transaction-status";
-import { adminDashboardStats, adminListRiskAndFraudEvents, adminListTransactions } from "./admin-queries";
+import {
+  adminDashboardStats,
+  adminGetTransactionDetail,
+  adminListRiskAndFraudEvents,
+  adminListTransactions,
+} from "./admin-queries";
 
 /**
  * Test d'intégration contre le vrai projet Supabase — fixtures directes
@@ -54,6 +59,44 @@ describe("Back Office — Transactions/Dashboard/Risk-Fraud admin queries (inté
 
     const byStatus = await adminListTransactions({ status: "settled" });
     expect(byStatus.transactions.some((t) => t.id === tx.id)).toBe(true);
+  });
+
+  it("adminListTransactions/adminGetTransactionDetail n'exposent plus le numéro externe ni les identifiants internes non affichés (Prompt 28, ADR-056)", async () => {
+    const reference = `NEX-VITEST${randomUUID().slice(0, 6).toUpperCase()}`;
+    const { data: tx } = await admin
+      .from("transactions")
+      .insert({
+        reference,
+        source_type: "linked_account",
+        destination_type: "external",
+        destination_external_reference: "+225070000000",
+        amount: 1000,
+        currency: "XOF",
+        fee: 35,
+        total: 1035,
+        fee_payer: "sender",
+        idempotency_key: randomUUID(),
+        provider_transaction_id: "vitest-secret-provider-tx-id",
+        status: "settled",
+      })
+      .select("*")
+      .single();
+    createdTransactionIds.push(tx!.id);
+
+    const list = await adminListTransactions({ reference });
+    const summary = list.transactions.find((t) => t.id === tx!.id);
+    expect(summary).toBeTruthy();
+    expect(summary).not.toHaveProperty("destination_external_reference");
+    expect(summary).not.toHaveProperty("source_reference");
+    expect(summary).not.toHaveProperty("destination_reference");
+    expect(summary).not.toHaveProperty("provider_transaction_id");
+    expect(summary).not.toHaveProperty("idempotency_key");
+    expect(summary).not.toHaveProperty("sender_user_id");
+    expect(summary).not.toHaveProperty("recipient_user_id");
+
+    const detail = await adminGetTransactionDetail(reference);
+    expect(detail?.transaction).not.toHaveProperty("destination_external_reference");
+    expect(detail?.transaction).not.toHaveProperty("provider_transaction_id");
   });
 
   it("adminDashboardStats compte les transactions créées aujourd'hui", async () => {

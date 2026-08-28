@@ -489,8 +489,12 @@ describe("Payment Orchestrator (intégration)", () => {
     // 90s : les 5 règlements déclenchent désormais un envoi de
     // notification réel (Prompt 20, plus le STUB instantané d'avant) sur
     // trois canaux chacun — davantage d'aller-retours réseau vers le
-    // vrai projet Supabase que ce test n'en avait au départ.
-  }, 90_000);
+    // vrai projet Supabase que ce test n'en avait au départ. Prompt 28
+    // (ADR-056) ajoute encore un aller-retour par règlement (réclamation
+    // atomique `ledger_settlement_claims`, nécessaire pour fermer une
+    // race condition réelle) — 76 s observées en isolation, marge portée
+    // à 150 s pour absorber la contention d'une suite complète.
+  }, 150_000);
 
   it("retries sûrs : rejouer la même idempotencyKey après règlement ne réexécute aucune étape", async () => {
     const linkedAccountId = await linkSandboxAccount(`+22509${randomUUID().slice(0, 8)}`);

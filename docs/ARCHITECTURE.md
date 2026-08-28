@@ -465,8 +465,18 @@ Domaine implémenté dans `src/domains/accounts/`, page `/accounts` (`src/app/(u
 - **Vérifié par 11 nouveaux tests** (instrumentation du Provider Gateway — résultat inchangé, erreur relancée telle quelle, `verifyAndParseWebhook` jamais chronométré ; les neuf mesures et le suivi de transaction contre le vrai projet Supabase, chacune isolée par un identifiant unique plutôt que par un état global) et manuellement dans le navigateur : `/admin/observability`, tableau de bord et recherche de trace sur une transaction réelle.
 - **Non couvert à ce stade** (TODO_DECISION, voir tableau) : aucune plateforme d'observabilité externe (Grafana/Datadog) n'est connectée — les mesures restent internes à Postgres, cohérent avec l'absence d'infrastructure de ce type dans ce dépôt ; aucun seuil d'alerte ni notification automatique en cas de dégradation ; la fenêtre glissante par défaut (24h) et le sous-ensemble de `SecurityEventType` considéré comme une anomalie d'authentification sont des choix raisonnables non documentés dans les sources.
 
-## 39. Prochaines étapes
+## 39. Security Audit (Prompt 28)
+
+Audit offensif sur les 15 catégories exigées par le prompt, mené par quatre passes de revue indépendantes couvrant l'intégralité de `src/` et des migrations — voir docs/DECISIONS.md ADR-056 pour le détail complet, constat par constat, du cycle DETECT → CLASSIFY → FIX → TEST → DOCUMENT.
+
+- **13 constats corrigés**, du plus sévère au plus mineur : deux races condition financières réelles sans contrainte en base (Ledger — double lot d'écritures possible sous course ; demandes d'argent — un payeur concurrent pouvait faire progresser une transaction en réalité débitée sur le compte d'un autre payeur) ; deux lacunes de brute-force (verrouillage PIN non atomique, aucune protection sur la connexion) ; trois expositions de données personnelles à une audience Back Office plus large que nécessaire (numéro de téléphone externe, empreinte d'appareil/hash IP/metadata brut, corps de notification) ; une injection de filtre PostgREST côté recherche admin ; une page Back Office sans permission explicite ; une colonne RLS trop permissive ; un cas non géré de contrainte unique (fiabilité, pas intégrité) ; un log potentiellement sensible.
+- **Migration `0020_security_audit.sql`** : trois fonctions Postgres (`bootstrap_super_admin`, `increment_pin_failed_attempts`, `record_login_failure`) remplaçant chacune un cycle lecture-puis-écriture non atomique par une opération unique verrouillée en base — c'est le mécanisme qui ferme réellement chaque race condition, pas une simple validation applicative supplémentaire. Deux nouvelles tables (`login_attempts`, `ledger_settlement_claims`), une nouvelle colonne (`money_requests.claimed_by_user_id`), une restriction de grant au niveau colonne (`notifications`).
+- **Un seul constat classifié mais non corrigé avec la même rigueur** (Limit Engine, race condition sur les plafonds) : documenté explicitement comme TODO_DECISION plutôt que masqué ou corrigé par un verrou qui n'aurait pas correctement tenu au travers des appels multiples d'un client Supabase à connexions mutualisées — une fausse confiance aurait été pire qu'une absence de correctif honnêtement documentée.
+- **Rien de nouveau à corriger dans ce qui était déjà solide** : XSS, CSRF, secrets, IDOR, replay (QR/demandes d'argent/confirmation email) et attribution de rôle RBAC ont chacun été vérifiés et confirmés propres, sans modification.
+- **Vérifié par 14 nouveaux tests** ciblant spécifiquement les races condition corrigées (appels réellement concurrents via `Promise.all`, jamais simulés séquentiellement) et les formes de données restreintes, en plus de la suite existante (toujours verte) — `tsc`, `eslint` et `npm run build` propres.
+
+## 40. Prochaines étapes
 
 Conformément au protocole, les prompts sont exécutés un par un avec validation entre chaque étape :
 
-- **Prompt 28** — à confirmer avec l'utilisateur avant de commencer.
+- **Prompt 29** — à confirmer avec l'utilisateur avant de commencer.

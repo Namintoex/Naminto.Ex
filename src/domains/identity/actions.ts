@@ -6,6 +6,7 @@ import { createHash } from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getOrCreateDeviceCookie, registerDevice } from "./devices";
+import { hashLoginEmail, isLoginLocked, recordLoginFailure, resetLoginAttempts } from "./login-lockout";
 import { hashPin, isValidPinFormat, verifyPinForUser } from "./pin";
 import { logSecurityEvent } from "./security-events";
 
@@ -85,13 +86,23 @@ export async function loginAction(
     return { error: "form.error.required" };
   }
 
+  // Anti-brute-force (Prompt 28, ADR-056) — vérifié avant même d'appeler
+  // Supabase Auth, contre une adresse existante ou non.
+  const emailHash = hashLoginEmail(email);
+  if (await isLoginLocked(emailHash)) {
+    return { error: "login.error.tooManyAttempts" };
+  }
+
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   const ipHash = await hashIp();
 
   if (error || !data.user) {
+    await recordLoginFailure(emailHash);
     return { error: "login.error.invalidCredentials" };
   }
+
+  await resetLoginAttempts(emailHash);
 
   const deviceFingerprint = await getOrCreateDeviceCookie();
   const h = await headers();

@@ -108,6 +108,30 @@ describe("transactions service (intégration Supabase)", () => {
     expect(count).toBe(1);
   });
 
+  it("deux appels réellement concurrents avec la même idempotencyKey ne créent jamais deux transactions, et le perdant sur la contrainte unique relit la ligne du gagnant au lieu d'échouer (Prompt 28, ADR-056)", async () => {
+    const idempotencyKey = `vitest-concurrent-${randomUUID()}`;
+    const params = {
+      recipientUserId: null,
+      sourceType: "naminto_wallet" as const,
+      sourceReference: null,
+      destinationType: "external" as const,
+      destinationReference: null,
+      provider: "wave" as const,
+      amount: 2_500,
+      idempotencyKey,
+    };
+
+    const [first, second] = await Promise.all([createTestTransaction(params), createTestTransaction(params)]);
+
+    expect(second.id).toBe(first.id);
+
+    const { count } = await admin
+      .from("transactions")
+      .select("id", { count: "exact", head: true })
+      .eq("idempotency_key", idempotencyKey);
+    expect(count).toBe(1);
+  });
+
   it("applique la State Machine sur une transition valide et journalise l'événement", async () => {
     const tx = await createTestTransaction({
       recipientUserId: null,

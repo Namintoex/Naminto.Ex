@@ -61,3 +61,15 @@ export class LedgerMissingSettlementError extends Error {
     this.name = "LedgerMissingSettlementError";
   }
 }
+
+/**
+ * Une autre exécution concurrente a réclamé l'écriture du même lot
+ * (transaction_id, kind) et n'a pas terminé de l'écrire dans le délai
+ * d'attente (Prompt 28, ADR-056) — jamais silencieusement ignorée.
+ */
+export class LedgerSettlementConflictError extends Error {
+  constructor(transactionId: string, kind: string) {
+    super(`Conflit d'écriture Ledger (${kind}) pour la transaction ${transactionId} — un autre appel concurrent n'a pas terminé à temps`);
+    this.name = "LedgerSettlementConflictError";
+  }
+}

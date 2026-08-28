@@ -457,6 +457,7 @@ export interface Database {
           note: string | null;
           status: MoneyRequestStatus;
           fulfilled_transaction_id: string | null;
+          claimed_by_user_id: string | null;
           expires_at: string;
           created_at: string;
           updated_at: string;
@@ -470,11 +471,13 @@ export interface Database {
           note?: string | null;
           status?: MoneyRequestStatus;
           fulfilled_transaction_id?: string | null;
+          claimed_by_user_id?: string | null;
           expires_at: string;
         };
         Update: Partial<{
           status: MoneyRequestStatus;
           fulfilled_transaction_id: string | null;
+          claimed_by_user_id: string | null;
           expires_at: string;
         }>;
         Relationships: [];
@@ -887,9 +890,53 @@ export interface Database {
         Update: never;
         Relationships: [];
       };
+      login_attempts: {
+        Row: {
+          email_hash: string;
+          failed_attempts: number;
+          locked_until: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          email_hash: string;
+          failed_attempts?: number;
+          locked_until?: string | null;
+        };
+        Update: Partial<{
+          failed_attempts: number;
+          locked_until: string | null;
+        }>;
+        Relationships: [];
+      };
+      ledger_settlement_claims: {
+        Row: {
+          transaction_id: string;
+          kind: "settlement" | "reversal" | "refund";
+          claimed_at: string;
+        };
+        Insert: {
+          transaction_id: string;
+          kind: "settlement" | "reversal" | "refund";
+        };
+        Update: never;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      bootstrap_super_admin: {
+        Args: { p_user_id: string };
+        Returns: boolean;
+      };
+      increment_pin_failed_attempts: {
+        Args: { p_user_id: string; p_max_attempts: number; p_lockout_minutes: number };
+        Returns: { attempts: number; locked: boolean; locked_until: string | null }[];
+      };
+      record_login_failure: {
+        Args: { p_email_hash: string; p_max_attempts: number; p_lockout_minutes: number };
+        Returns: { attempts: number; locked: boolean; locked_until: string | null }[];
+      };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };

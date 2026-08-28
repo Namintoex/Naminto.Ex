@@ -86,7 +86,7 @@ export const adminNavItems: NavItem[] = [
   { href: "/admin/faq", labelKey: "nav.admin.faq", icon: HelpCircle, permission: "faq.manage" },
   { href: "/admin/legal", labelKey: "nav.admin.legal", icon: Scale, permission: "legal.manage" },
   { href: "/admin/notifications", labelKey: "nav.admin.notifications", icon: Bell, permission: "notification.read" },
-  { href: "/admin/incidents", labelKey: "nav.admin.incidents", icon: Siren },
+  { href: "/admin/incidents", labelKey: "nav.admin.incidents", icon: Siren, permission: "incident.read" },
   { href: "/admin/audit", labelKey: "nav.admin.audit", icon: ClipboardList, permission: "audit.read" },
   {
     href: "/admin/observability",

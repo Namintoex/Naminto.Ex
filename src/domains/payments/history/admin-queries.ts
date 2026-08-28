@@ -3,11 +3,31 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import type { Database } from "@/lib/supabase/database.types";
 import type { TransactionStatus } from "../transaction-status";
 
-type TransactionRow = Database["public"]["Tables"]["transactions"]["Row"];
 type StatusEventRow = Database["public"]["Tables"]["transaction_status_events"]["Row"];
 type LedgerEntryRow = Database["public"]["Tables"]["ledger_entries"]["Row"];
 
 const PAGE_SIZE = 25;
+
+/**
+ * Forme volontairement restreinte (Prompt 28, ADR-056) : ni les vues
+ * liste/détail n'affichent jamais autre chose que ces champs, mais
+ * `select("*")` envoyait quand même la ligne complète — y compris
+ * `destination_external_reference` (numéro de téléphone du destinataire
+ * externe) — au navigateur de tout admin ayant `transaction.read`
+ * (support, compliance, risk, finance, security), simplement non rendue
+ * mais lisible via les outils de développement.
+ */
+export interface AdminTransactionSummary {
+  id: string;
+  reference: string;
+  amount: number;
+  currency: string;
+  fee: number;
+  status: TransactionStatus;
+  created_at: string;
+}
+
+const TRANSACTION_SUMMARY_COLUMNS = "id, reference, amount, currency, fee, status, created_at";
 
 export interface AdminTransactionFilters {
   reference?: string;
@@ -15,7 +35,7 @@ export interface AdminTransactionFilters {
 }
 
 export interface AdminListTransactionsResult {
-  transactions: TransactionRow[];
+  transactions: AdminTransactionSummary[];
   total: number;
   page: number;
   pageSize: number;
@@ -34,7 +54,7 @@ export async function adminListTransactions(
   page = 1
 ): Promise<AdminListTransactionsResult> {
   const admin = createAdminClient();
-  let query = admin.from("transactions").select("*", { count: "exact" });
+  let query = admin.from("transactions").select(TRANSACTION_SUMMARY_COLUMNS, { count: "exact" });
 
   if (filters.reference) {
     query = query.ilike("reference", `%${filters.reference.trim()}%`);
@@ -52,7 +72,7 @@ export async function adminListTransactions(
 }
 
 export interface AdminTransactionDetail {
-  transaction: TransactionRow;
+  transaction: AdminTransactionSummary;
   timeline: StatusEventRow[];
   ledgerEntries: LedgerEntryRow[];
 }
@@ -61,7 +81,7 @@ export async function adminGetTransactionDetail(reference: string): Promise<Admi
   const admin = createAdminClient();
   const { data: transaction } = await admin
     .from("transactions")
-    .select("*")
+    .select(TRANSACTION_SUMMARY_COLUMNS)
     .eq("reference", reference.trim().toUpperCase())
     .maybeSingle();
   if (!transaction) return null;

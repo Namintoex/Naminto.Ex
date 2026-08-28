@@ -37,8 +37,18 @@ export async function adminListUsers(
   let query = admin.from("identity_profiles").select("*", { count: "exact" });
 
   if (filters.search) {
-    const term = filters.search.trim();
-    query = query.or(`naminto_id.ilike.%${term}%,legal_name.ilike.%${term}%`);
+    // `.or()` parse sa chaîne comme une expression du mini-langage de
+    // filtre PostgREST (contrairement à `.eq()`/`.ilike()` — Prompt 28,
+    // ADR-056) : virgule/point/parenthèse y sont des caractères
+    // réservés (séparateur de clause, structure column.op.value,
+    // groupement). PostgREST neutralise ces caractères dans une valeur
+    // en l'entourant de guillemets doubles — jamais par un antislash nu
+    // devant chaque caractère, qui finit littéralement dans la valeur
+    // comparée et casse une recherche pourtant légitime. Seuls le
+    // guillemet double et l'antislash doivent être échappés à
+    // l'intérieur de la valeur ainsi entre guillemets.
+    const term = filters.search.trim().replace(/[\\"]/g, "\\$&");
+    query = query.or(`naminto_id.ilike."%${term}%",legal_name.ilike."%${term}%"`);
   }
   if (filters.kycStatus) {
     query = query.eq("kyc_status", filters.kycStatus);
@@ -52,11 +62,32 @@ export async function adminListUsers(
   return { users: data ?? [], total: count ?? 0, page: safePage, pageSize: PAGE_SIZE };
 }
 
+/**
+ * Formes volontairement restreintes (Prompt 28, ADR-056) : la fiche
+ * utilisateur n'affiche jamais que plateforme/statut par appareil et
+ * type/date par événement, mais `select("*")` envoyait quand même
+ * `device_fingerprint`, `ip_hash` et le `metadata` brut de chaque
+ * événement (transitions KYC, raisons de blocage…) au navigateur de
+ * tout admin ayant `user.read` (support, kyc, compliance, security) —
+ * une audience bien plus large que celle qui a réellement besoin de ces
+ * détails de forensic (le rôle `security`, via /admin/audit).
+ */
+export interface AdminUserDeviceSummary {
+  id: string;
+  platform: string | null;
+  status: DeviceRow["status"];
+}
+export interface AdminUserSecurityEventSummary {
+  id: string;
+  type: SecurityEventRow["type"];
+  created_at: string;
+}
+
 export interface AdminUserDetail {
   profile: IdentityProfileRow;
   email: string | null;
-  devices: DeviceRow[];
-  securityEvents: SecurityEventRow[];
+  devices: AdminUserDeviceSummary[];
+  securityEvents: AdminUserSecurityEventSummary[];
 }
 
 export async function adminGetUserDetail(userId: string): Promise<AdminUserDetail | null> {
@@ -67,10 +98,10 @@ export async function adminGetUserDetail(userId: string): Promise<AdminUserDetai
 
   const [{ data: authUser }, { data: devices }, { data: securityEvents }] = await Promise.all([
     admin.auth.admin.getUserById(userId),
-    admin.from("devices").select("*").eq("user_id", userId).order("last_seen_at", { ascending: false }),
+    admin.from("devices").select("id, platform, status").eq("user_id", userId).order("last_seen_at", { ascending: false }),
     admin
       .from("security_events")
-      .select("*")
+      .select("id, type, created_at")
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
       .limit(20),

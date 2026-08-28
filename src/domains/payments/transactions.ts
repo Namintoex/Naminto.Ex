@@ -97,12 +97,26 @@ export async function createTransaction(params: CreateTransactionParams) {
     .select("*")
     .single();
 
-  if (error || !data) {
-    throw new Error(`createTransaction failed: ${error?.message ?? "unknown error"}`);
+  if (data) {
+    await recordStatusEvent(data.id, null, "created");
+    return data;
   }
 
-  await recordStatusEvent(data.id, null, "created");
-  return data;
+  // Course entre deux appels concurrents avec la même idempotencyKey
+  // (Prompt 28, ADR-056) : celui qui perd sur la contrainte unique
+  // relit simplement la transaction créée par l'autre, au lieu de faire
+  // échouer tout l'orchestrateur pour une requête pourtant légitimement
+  // idempotente — même correctif déjà appliqué à getOrCreateLedgerAccount.
+  if (error?.code === "23505") {
+    const { data: retried } = await admin
+      .from("transactions")
+      .select("*")
+      .eq("idempotency_key", params.idempotencyKey)
+      .maybeSingle();
+    if (retried) return retried;
+  }
+
+  throw new Error(`createTransaction failed: ${error?.message ?? "unknown error"}`);
 }
 
 /**

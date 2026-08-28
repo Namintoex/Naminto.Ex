@@ -7,6 +7,7 @@ import {
   LedgerImbalanceError,
   LedgerInvalidAmountError,
   LedgerMissingSettlementError,
+  LedgerSettlementConflictError,
   LedgerTransactionNotFoundError,
   type LedgerEntryInput,
   type LedgerEntryKind,
@@ -123,6 +124,39 @@ async function existingEntries(
 }
 
 /**
+ * Réclame l'exclusivité d'écriture d'un lot (transaction_id, kind) via
+ * `ledger_settlement_claims` (Prompt 28, ADR-056) — la clé primaire de
+ * cette table garantit qu'un seul appelant concurrent gagne jamais cette
+ * réclamation, contrairement à `ledger_entries` elle-même qui contient
+ * plusieurs lignes légitimes par (transaction_id, kind) et ne peut donc
+ * pas porter cette contrainte directement.
+ */
+async function claimSettlement(
+  admin: ReturnType<typeof createAdminClient>,
+  transactionId: string,
+  kind: LedgerEntryKind
+): Promise<boolean> {
+  const { error } = await admin.from("ledger_settlement_claims").insert({ transaction_id: transactionId, kind });
+  if (!error) return true;
+  if (error.code === "23505") return false;
+  throw new Error(`claimSettlement failed: ${error.message}`);
+}
+
+/** Le perdant de la réclamation attend que le gagnant ait fini d'écrire, plutôt que de renvoyer un lot vide ou d'écrire en double. */
+async function waitForExistingEntries(
+  admin: ReturnType<typeof createAdminClient>,
+  transactionId: string,
+  kind: LedgerEntryKind
+): Promise<LedgerEntryRow[]> {
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const found = await existingEntries(admin, transactionId, kind);
+    if (found.length > 0) return found;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new LedgerSettlementConflictError(transactionId, kind);
+}
+
+/**
  * Dérive les écritures de règlement (kind=settlement) d'une transaction
  * déjà `provider_confirmed` et les écrit. Idempotent : rejouer avec le
  * même transactionId ne produit jamais de deuxième lot d'écritures
@@ -135,6 +169,13 @@ export async function recordSettlement(transactionId: string): Promise<LedgerEnt
 
   const already = await existingEntries(admin, transactionId, "settlement");
   if (already.length > 0) return already;
+
+  // Réclamation atomique (Prompt 28, ADR-056) avant d'écrire : sans elle,
+  // deux appels concurrents pouvaient tous deux passer la vérification
+  // `already.length > 0` ci-dessus et produire un double lot d'écritures.
+  if (!(await claimSettlement(admin, transactionId, "settlement"))) {
+    return waitForExistingEntries(admin, transactionId, "settlement");
+  }
 
   const fee = Number(tx.fee);
   const amount = Number(tx.amount);
@@ -164,6 +205,10 @@ async function recordMirror(transactionId: string, kind: "reversal" | "refund"):
 
   const already = await existingEntries(admin, transactionId, kind);
   if (already.length > 0) return already;
+
+  if (!(await claimSettlement(admin, transactionId, kind))) {
+    return waitForExistingEntries(admin, transactionId, kind);
+  }
 
   const settlement = await existingEntries(admin, transactionId, "settlement");
   if (settlement.length === 0) throw new LedgerMissingSettlementError(transactionId);
