@@ -485,8 +485,17 @@ Audit offensif sur les 15 catégories exigées par le prompt, mené par quatre p
 - **Back Office** (`/admin/countries`, `/admin/countries/[code]`) : formulaire de création étendu (langues/fournisseurs/rails/notes de confidentialité, valeurs invalides silencieusement écartées) ; nouvelle page de détail affichant le profil agrégé complet (tarification/limites/KYC-AML/documents légaux inclus).
 - **Vérifié par 8 nouveaux tests** (régression + extensibilité de `validateRequest` ; agrégation réelle de `getCountryProfile` contre le vrai projet Supabase ; parsing/filtrage des nouveaux champs du formulaire admin) en plus de la suite existante (300 tests, toujours verte) — `tsc`, `eslint` et `npm run build` propres ; vérifié manuellement dans le navigateur, y compris une régression Send Money réelle en XOF bout en bout.
 
-## 41. Prochaines étapes
+## 41. Final Production Gate (Prompt 30)
+
+`docs/PRODUCTION_READINESS.md` — revue complète des 12 domaines, 15 catégories d'audit et 12 scénarios explicites exigés par le Master Prompt, sans développer aucune nouvelle fonctionnalité (consigne explicite du prompt). Voir docs/DECISIONS.md ADR-058 pour la décision complète.
+
+- **Verdict : NON production-ready.** Trois `FAIL` critiques, aucun n'étant un défaut de code : `limit_rules` vide (aucun plafond réel configuré) ; aucun fournisseur `REAL` connecté (aucun mouvement d'argent réel possible) ; aucune stratégie Backup/DR jamais définie.
+- **Un seul défaut de code réel trouvé et corrigé** : `TIMEOUT` (`OrchestratorErrorCode`, déclaré depuis le Prompt 09) n'était jamais réellement atteignable — aucun code n'appelait `new OrchestratorError("TIMEOUT", ...)`. Corrigé par `withTimeout()` (`orchestrator-steps/execute-provider.ts`) : course entre l'appel fournisseur et un délai de 30s (`PROVIDER_CALL_TIMEOUT_MS`), `executeProviderTransfer` acceptant désormais un `timeoutMs` paramétrable pour rester testable sans attendre un vrai délai.
+- **304 tests (55 fichiers) toujours verts** contre le vrai projet Supabase après le correctif, `tsc`/`eslint`/`npm run build` propres. Vérifié manuellement dans le navigateur : action admin non autorisée réellement bloquée côté serveur (compte réel sans rôle → `/admin/forbidden`), aucun débordement horizontal à 375px sur trois écrans représentatifs, flux Send Money réel bout en bout (référence `NEX-EEBEED50`).
+- **Portée volontairement limitée** : ni framework E2E (Playwright/Cypress) ni outil d'audit d'accessibilité automatisé (axe-core) n'ont été installés — chacun constituerait une nouvelle capacité d'infrastructure disproportionnée pour un prompt de clôture, documentés comme TODO_DECISION plutôt que construits dans l'urgence.
+
+## 42. Prochaines étapes
 
 Conformément au protocole, les prompts sont exécutés un par un avec validation entre chaque étape :
 
-- **Prompt 30** — à confirmer avec l'utilisateur avant de commencer.
+- **Prompt 30 terminé.** Le protocole des 30 prompts ultra-directifs est intégralement exécuté. Toute suite (adapters REAL, valeurs de limites réelles, Backup/DR, Availability Engine section 47, etc.) relève de décisions produit/business explicitement hors du périmètre technique de ce protocole — voir `docs/PRODUCTION_READINESS.md` §10 et le tableau `TODO_DECISION` de `docs/DECISIONS.md`.
