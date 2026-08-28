@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useState, type ReactNode } from "react";
 import { Info } from "lucide-react";
 import {
   Alert,
@@ -16,7 +16,8 @@ import { useLocale } from "@/design-system/i18n/locale-provider";
 import { linkAccountAction, type ActionResult } from "@/domains/accounts/actions";
 import { PROVIDERS } from "@/domains/accounts/providers";
 
-export function LinkAccountDialog() {
+/** `trigger` : élément déclencheur personnalisé (ex. bouton "+" du tableau de bord) — le bouton texte par défaut reste utilisé sur `/accounts`. */
+export function LinkAccountDialog({ trigger }: { trigger?: ReactNode } = {}) {
   const { t } = useLocale();
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState<ActionResult | null, FormData>(
@@ -32,9 +33,7 @@ export function LinkAccountDialog() {
 
   return (
     <Modal open={open} onOpenChange={setOpen}>
-      <ModalTrigger asChild>
-        <Button>{t("accounts.link.button")}</Button>
-      </ModalTrigger>
+      <ModalTrigger asChild>{trigger ?? <Button>{t("accounts.link.button")}</Button>}</ModalTrigger>
       <ModalContent title={t("accounts.link.title")}>
         <div className="flex flex-col gap-4">
           <Alert variant="info" title={t("accounts.link.disclaimer.title")}>

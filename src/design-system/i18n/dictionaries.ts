@@ -100,6 +100,10 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "comingSoon.body":
       "Cet espace sera construit à une prochaine étape du protocole des 30 prompts.",
 
+    "dashboard.network.title": "Votre réseau",
+    "dashboard.wallet.title": "Naminto.Ex",
+    "dashboard.wallet.subtitle": "Portefeuille Naminto.Ex",
+
     "notifications.title": "Notifications",
     "notifications.empty.title": "Aucune notification",
     "notifications.empty.body": "Vous serez prévenu ici dès qu'il y aura du nouveau.",
@@ -228,8 +232,8 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "accounts.link.provider": "Fournisseur",
     "accounts.link.reference": "Numéro de téléphone ou référence",
     "accounts.link.reference.helper": "Ce numéro sera utilisé uniquement pour identifier le compte lié.",
-    "accounts.link.disclaimer.title": "Démonstration — aucune connexion réelle",
-    "accounts.link.disclaimer.body": "Le Provider Gateway (intégration réelle avec les fournisseurs) n'est pas encore construit à cette étape du projet. Cette liaison crée un enregistrement local, sans connexion effective au fournisseur.",
+    "accounts.link.disclaimer.title": "SANDBOX — aucune connexion réelle",
+    "accounts.link.disclaimer.body": "Aucun fournisseur REAL n'est connecté à Naminto.Ex : cette liaison utilise l'environnement SANDBOX du Provider Gateway (soldes et transferts simulés), jamais votre compte réel chez ce fournisseur.",
     "accounts.link.consent.canView": "Ce que Naminto.Ex pourra consulter : le solde et l'historique des transactions de ce compte, une fois le Provider Gateway connecté.",
     "accounts.link.consent.canDo": "Ce que Naminto.Ex pourra faire : initier des transferts depuis ou vers ce compte, avec votre confirmation à chaque opération.",
     "accounts.link.consent.cannotDo": "Ce que Naminto.Ex ne fera jamais : demander ou stocker le PIN ou mot de passe de ce compte externe.",
@@ -909,6 +913,10 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "comingSoon.body":
       "This space will be built in a later step of the 30-prompt protocol.",
 
+    "dashboard.network.title": "Your network",
+    "dashboard.wallet.title": "Naminto.Ex",
+    "dashboard.wallet.subtitle": "Naminto.Ex wallet",
+
     "notifications.title": "Notifications",
     "notifications.empty.title": "No notifications",
     "notifications.empty.body": "You'll be notified here as soon as there's something new.",
@@ -1037,8 +1045,8 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "accounts.link.provider": "Provider",
     "accounts.link.reference": "Phone number or reference",
     "accounts.link.reference.helper": "This number is only used to identify the linked account.",
-    "accounts.link.disclaimer.title": "Demo — no real connection",
-    "accounts.link.disclaimer.body": "The Provider Gateway (real integration with providers) hasn't been built yet at this stage of the project. This link creates a local record, with no effective connection to the provider.",
+    "accounts.link.disclaimer.title": "SANDBOX — no real connection",
+    "accounts.link.disclaimer.body": "No REAL provider is connected to Naminto.Ex: this link uses the Provider Gateway's SANDBOX environment (simulated balances and transfers), never your real account with this provider.",
     "accounts.link.consent.canView": "What Naminto.Ex will be able to view: this account's balance and transaction history, once the Provider Gateway is connected.",
     "accounts.link.consent.canDo": "What Naminto.Ex will be able to do: initiate transfers from or to this account, with your confirmation for each operation.",
     "accounts.link.consent.cannotDo": "What Naminto.Ex will never do: ask for or store this external account's PIN or password.",

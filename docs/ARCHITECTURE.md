@@ -502,7 +502,16 @@ Hors protocole des 30 prompts — demandée par l'utilisateur avant la première
 - **21 défauts réels corrigés**, le plus sévère : `runPaymentOrchestrator` renvoyait un succès (`replayed: true`) pour le rejeu d'une `idempotencyKey` dont la tentative précédente avait en réalité échoué — `isSuccessfulTerminalStatus` (`transaction-status.ts`) ferme ce gap. Trois autres races de concurrence corrigées avec leur propre test par appels réellement concurrents : `cancelMoneyRequest` vs `fulfillMoneyRequest`, double-traitement d'un webhook (nouvel index unique partiel, migration 0022), notification manquée pour un destinataire sur deux d'un règlement portefeuille-à-portefeuille. Un défaut métier réel dans le Limit Engine (usage agrégé tous fournisseurs confondus, même pour une règle `provider`-spécifique) et dans `CountryProfile` (règles génériques `country: null` ignorées pour pricing/limits/kycAml, contrairement à `legalRules`). Un défaut de sécurité réel : changement de PIN sans réauthentification de l'ancien — corrigé (`verifyPinForUser` désormais requis, champ « PIN actuel » ajouté au formulaire). Une policy RLS `devices` trop permissive, une fuite de données (`/pay/[token]` transmettait la ligne complète à un composant client).
 - **Vérifié empiriquement** : 310 tests (56 fichiers, +9 par rapport au Prompt 30), `tsc`/`eslint`/`npm run build` propres, migration 0022 appliquée au vrai projet Supabase, vérification manuelle du changement de PIN dans le navigateur.
 
-## 43. Prochaines étapes
+## 43. Tableau de bord — réseau de comptes
+
+Hors protocole des 30 prompts — demande explicite de l'utilisateur. Voir docs/DECISIONS.md ADR-060.
+
+- `/` n'est plus un `ComingSoonPage` : titre de page supprimé, bouton rond « + » ouvrant directement le formulaire de liaison de compte déjà construit au Prompt 06/07 (`LinkAccountDialog`, rendu réutilisable via une prop `trigger`), et un « réseau » de comptes (grille de cartes) montrant le portefeuille Naminto.Ex et chaque compte lié actif, avec son solde.
+- **Solde de portefeuille enfin consultable** (`ledger/queries.ts::getWalletBalances`) — recalculé à la volée depuis `ledger_entries` par devise, jamais stocké, même principe que le reçu (ADR-044) et le Back Office Ledger. Referme un gap resté ouvert depuis le Prompt 12 (« solde de portefeuille consultable par l'utilisateur… aucune UI ne les agrège encore »).
+- `getLinkedAccountsWithBalances` (`accounts/queries.ts`) et `LinkedAccountCard` factorisent ce qui était dupliqué en ligne dans `/accounts/page.tsx`/`accounts-view.tsx` — désormais partagés par les deux écrans.
+- Vérifié manuellement dans le navigateur (fonctions RLS-dépendantes, non testables par Vitest) : solde réel affiché, liaison/déliaison d'un compte de test mettant à jour le réseau immédiatement, `/accounts` inchangé après factorisation, FR/EN.
+
+## 44. Prochaines étapes
 
 Conformément au protocole, les prompts sont exécutés un par un avec validation entre chaque étape :
 
