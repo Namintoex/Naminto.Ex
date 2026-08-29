@@ -35,6 +35,7 @@ export function RegisterForm() {
             name="phoneNumber"
             label={t("auth.phoneNumber")}
             helperText={t("auth.phoneNumber.helper")}
+            required
             autoComplete="tel"
           />
           <Input type="email" name="email" label={t("auth.email")} required autoComplete="email" />

@@ -125,7 +125,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "auth.legalName": "Nom légal (tel que sur votre pièce d'identité)",
     "auth.namintoId": "Identifiant Naminto.Ex",
     "auth.namintoId.helper": "Lettres minuscules, chiffres et underscore uniquement — 3 à 20 caractères.",
-    "auth.phoneNumber": "Numéro de téléphone (facultatif pour l'instant)",
+    "auth.phoneNumber": "Numéro de téléphone",
     "auth.phoneNumber.helper": "La vérification par SMS sera activée prochainement.",
 
     "login.title": "Connexion à Naminto.Ex",
@@ -948,7 +948,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "auth.legalName": "Legal name (as on your ID document)",
     "auth.namintoId": "Naminto.Ex ID",
     "auth.namintoId.helper": "Lowercase letters, digits and underscore only — 3 to 20 characters.",
-    "auth.phoneNumber": "Phone number (optional for now)",
+    "auth.phoneNumber": "Phone number",
     "auth.phoneNumber.helper": "SMS verification will be enabled soon.",
 
     "login.title": "Sign in to Naminto.Ex",

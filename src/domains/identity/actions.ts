@@ -33,7 +33,7 @@ export async function registerAction(
   const namintoId = String(formData.get("namintoId") ?? "").trim().toLowerCase();
   const phoneNumber = String(formData.get("phoneNumber") ?? "").trim();
 
-  if (!email || !password || !legalName || !namintoId) {
+  if (!email || !password || !legalName || !namintoId || !phoneNumber) {
     return { error: "form.error.required" };
   }
   if (password.length < 8) {
@@ -54,7 +54,7 @@ export async function registerAction(
       data: {
         naminto_id: namintoId,
         legal_name: legalName,
-        phone_number: phoneNumber || null,
+        phone_number: phoneNumber,
       },
       emailRedirectTo: `${origin}/auth/confirm?next=${encodeURIComponent("/security/pin?welcome=1")}`,
     },
